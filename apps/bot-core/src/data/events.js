@@ -1,6 +1,6 @@
 const axios = require('axios')
 
-const handlers = { sale: [], listing: [], offer_accepted: [] }
+const handlers = { sale: [] }
 const lastChecked = new Map()
 
 function on(event, fn) {

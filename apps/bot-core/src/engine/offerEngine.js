@@ -7,10 +7,13 @@ const { notify } = require('../notify')
 
 async function runOfferCycle(ctx) {
   const { wallet, user } = ctx
-  const { id: userId, offerPriceEth, offerMaxActive, maxGasGwei, paperTrading } = user
+  const { id: userId, offerMaxActive, maxGasGwei, paperTrading } = user
   const offerExpiryMin = user.offerExpiryMin ?? 1440
 
-  if (!offerPriceEth) return
+  if (!user.offerBelowFloor) {
+    await log(userId, 'warn', 'offer', 'offerBelowFloor non configuré — bot inactif')
+    return
+  }
 
   // Annuler les offres expirées ou marquées cancelled par l'API
   const toCancel = await prisma.offer.findMany({
@@ -57,19 +60,11 @@ async function runOfferCycle(ctx) {
 
     // Prix : floor - offerBelowFloor (dynamique) OU prix fixe OU config collection
     const belowFloor = col.offerBelowFloor ?? user.offerBelowFloor
-    const fixedPrice = col.offerPriceEth ?? offerPriceEth
     const expiry     = col.offerExpiryMin ?? offerExpiryMin
 
-    let price
-    if (belowFloor != null) {
-      price = parseFloat((floor - belowFloor).toFixed(6))
-      if (price <= 0) {
-        await log(userId, 'warn', 'offer', `Prix négatif (floor ${floor} - ${belowFloor} = ${price}) — offre ignorée pour ${col.collectionName}`)
-        continue
-      }
-    } else if (fixedPrice) {
-      price = fixedPrice
-    } else {
+    const price = parseFloat((floor - belowFloor).toFixed(6))
+    if (price <= 0) {
+      await log(userId, 'warn', 'offer', `Prix négatif (floor ${floor} - ${belowFloor} = ${price}) — offre ignorée pour ${col.collectionName}`)
       continue
     }
 

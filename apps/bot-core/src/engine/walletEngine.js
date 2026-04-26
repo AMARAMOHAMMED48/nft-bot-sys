@@ -1,7 +1,6 @@
 const prisma = require('../lib/prisma')
 const { loadWallet } = require('../execution/wallet')
 const { runOfferCycle } = require('./offerEngine')
-const { onNewListing } = require('./buyEngine')
 const { checkStopLoss, onSale } = require('./riskManager')
 const { on } = require('../data/events')
 const { startPositionMonitor } = require('../monitor/positions')
@@ -14,7 +13,6 @@ function startEngine(user) {
   const { wallet } = loadWallet(user.walletKeyEnc)
 
   const interval = setInterval(async () => {
-    // Recharge le user depuis la DB à chaque cycle (config toujours à jour)
     const freshUser = await prisma.user.findUnique({ where: { id: user.id } })
     if (!freshUser || !freshUser.botEnabled) {
       stopEngine(user.id)
@@ -32,12 +30,12 @@ function startEngine(user) {
 
   activeEngines.set(user.id, { interval, wallet })
 
-  on('listing', data => onNewListing({ wallet, user, listing: data }))
+  // Ventes détectées via polling OpenSea
   on('sale', data => onSale({ user, saleData: data }))
 
+  // Moniteur wallet — détecte les offres acceptées
   startPositionMonitor({ wallet, user })
 
-  // Premier cycle immédiat avec user frais
   prisma.user.findUnique({ where: { id: user.id } }).then(freshUser => {
     if (freshUser) runOfferCycle({ wallet, user: freshUser })
   })
