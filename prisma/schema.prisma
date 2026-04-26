@@ -17,18 +17,15 @@ model User {
   walletAddress  String?
   walletKeyEnc   String?
   // Config bot par user
-  paperTrading   Boolean          @default(true)
-  offerPriceEth    Float?
-  offerBelowFloor  Float?
-  offerMaxActive   Int              @default(5)
-  budgetMaxEth   Float            @default(1.0)
-  stopLossEth    Float            @default(0.15)
-  buyTriggerPct  Float            @default(0.88)
-  maxGasGwei     Int              @default(35)
-  offerExpiryMin Int              @default(1440)
-  listExpiryMin  Int              @default(10080)
-  timeoutSellH   Int              @default(72)
-  maxPositions   Int              @default(3)
+  paperTrading    Boolean          @default(true)
+  offerBelowFloor Float?
+  offerMaxActive  Int              @default(5)
+  budgetMaxEth    Float            @default(1.0)
+  stopLossEth     Float            @default(0.15)
+  maxGasGwei      Int              @default(35)
+  offerExpiryMin  Int              @default(1440)
+  listExpiryMin   Int              @default(10080)
+  timeoutSellH    Int              @default(72)
   botEnabled     Boolean          @default(false)
   discordWebhook String?
   createdAt      DateTime         @default(now())
@@ -45,7 +42,6 @@ model UserCollection {
   collectionName    String
   enabled           Boolean  @default(true)
   // Config optionnelle par collection (override config globale si renseignée)
-  offerPriceEth     Float?
   offerBelowFloor   Float?
   offerExpiryMin    Int?
   createdAt         DateTime @default(now())
