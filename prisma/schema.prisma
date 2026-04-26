@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String           @id @default(uuid())
+  email          String           @unique
+  passwordHash   String
+  role           String           @default("trader")
+  // Wallet — clé chiffrée AES-256-GCM, jamais en clair
+  walletAddress  String?
+  walletKeyEnc   String?
+  // Config bot par user
+  paperTrading   Boolean          @default(true)
+  offerPriceEth    Float?
+  offerBelowFloor  Float?
+  offerMaxActive   Int              @default(5)
+  budgetMaxEth   Float            @default(1.0)
+  stopLossEth    Float            @default(0.15)
+  buyTriggerPct  Float            @default(0.88)
+  maxGasGwei     Int              @default(35)
+  offerExpiryMin Int              @default(1440)
+  listExpiryMin  Int              @default(10080)
+  timeoutSellH   Int              @default(72)
+  maxPositions   Int              @default(3)
+  botEnabled     Boolean          @default(false)
+  discordWebhook String?
+  createdAt      DateTime         @default(now())
+  collections    UserCollection[]
+  trades         Trade[]
+  offers         Offer[]
+  logs           BotLog[]
+}
+
+model UserCollection {
+  id                String   @id @default(uuid())
+  userId            String
+  collectionAddress String
+  collectionName    String
+  enabled           Boolean  @default(true)
+  // Config optionnelle par collection (override config globale si renseignée)
+  offerPriceEth     Float?
+  offerBelowFloor   Float?
+  offerExpiryMin    Int?
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, collectionAddress])
+  @@index([userId])
+}
+
+model Trade {
+  id           String    @id @default(uuid())
+  userId       String
+  tokenId      String
+  collection   String
+  source       String
+  buyPrice     Float
+  buyTxHash    String?
+  listPrice    Float?
+  sellPrice    Float?
+  sellTxHash   String?
+  gasBuy       Float?
+  gasSell      Float?
+  pnl          Float?
+  status       String
+  isPaperTrade Boolean   @default(true)
+  boughtAt     DateTime  @default(now())
+  listedAt     DateTime?
+  soldAt       DateTime?
+  user         User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([userId, boughtAt])
+}
+
+model Offer {
+  id           String    @id @default(uuid())
+  userId       String
+  collection   String
+  offerPrice   Float
+  floorAtOffer Float
+  offerTxHash  String?
+  status       String
+  isPaperTrade Boolean   @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  acceptedAt   DateTime?
+  user         User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+}
+
+model FloorSnapshot {
+  id         String   @id @default(uuid())
+  collection String
+  floorPrice Float
+  volume24h  Float?
+  listings   Int?
+  recordedAt DateTime @default(now())
+
+  @@index([collection, recordedAt])
+}
+
+model BotLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  level     String
+  module    String
+  message   String
+  data      Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([level, createdAt])
+}

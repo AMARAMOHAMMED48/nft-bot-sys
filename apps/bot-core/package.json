@@ -1,0 +1,17 @@
+{
+  "name": "bot-core",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@opensea/seaport-js": "^4.0.0",
+    "@prisma/client": "^5.22.0",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
+    "node-fetch": "^3.3.2"
+  }
+}

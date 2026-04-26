@@ -1,0 +1,16 @@
+const crypto = require('crypto')
+
+const ALGORITHM = 'aes-256-gcm'
+const KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex')
+
+function decrypt(payload) {
+  const [ivHex, tagHex, encHex] = payload.split(':')
+  const iv = Buffer.from(ivHex, 'hex')
+  const tag = Buffer.from(tagHex, 'hex')
+  const encrypted = Buffer.from(encHex, 'hex')
+  const decipher = crypto.createDecipheriv(ALGORITHM, KEY, iv)
+  decipher.setAuthTag(tag)
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8')
+}
+
+module.exports = { decrypt }
