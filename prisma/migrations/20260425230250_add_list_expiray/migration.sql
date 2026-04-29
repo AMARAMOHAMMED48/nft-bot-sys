@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "User" ADD COLUMN     "listExpiryMin" INTEGER NOT NULL DEFAULT 10080;
