@@ -157,6 +157,7 @@ async function recoverMissingTrades({ wallet, user }) {
 
   const addresses = collections.map(c => c.collectionAddress)
   const nfts = (await fetchWalletNFTs(user.walletAddress, addresses)).filter(n => n.contract?.address && n.tokenId)
+  console.log(`[recovery] Wallet scan — ${nfts.length} NFT(s) trouvé(s) dans les collections surveillées`)
 
   for (const nft of nfts) {
     const collection = nft.contract.address.toLowerCase()

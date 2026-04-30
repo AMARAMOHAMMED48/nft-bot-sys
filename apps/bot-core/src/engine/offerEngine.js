@@ -50,6 +50,15 @@ async function runOfferCycle(ctx) {
   })
   const totalEngaged = budgetEngaged._sum.offerPrice ?? 0
 
+  // Vérification WETH globale avant la boucle (évite N warnings pour N collections)
+  if (!paperTrading) {
+    const weth = await getWethBalance(wallet)
+    if (weth < 0.001) {
+      await log(userId, 'warn', 'offer', `WETH quasi-vide : ${weth} ETH — cycle ignoré`)
+      return
+    }
+  }
+
   const collections = await prisma.userCollection.findMany({
     where: { userId, enabled: true }
   })
@@ -95,12 +104,12 @@ async function runOfferCycle(ctx) {
       continue
     }
 
-    // WETH check en mode réel
+    // WETH check par offre (le check global en début de cycle filtre déjà les cas vides)
     if (!paperTrading) {
       const weth = await getWethBalance(wallet)
       if (weth < price) {
-        await log(userId, 'warn', 'offer', `WETH insuffisant : ${weth} < ${price}`)
-        continue
+        await log(userId, 'warn', 'offer', `WETH insuffisant pour ${col.collectionName} : ${weth} < ${price} ETH`)
+        return  // Plus assez de WETH pour la suite, inutile de continuer
       }
     }
 
