@@ -3,7 +3,10 @@ const { ethers } = require('ethers')
 const prisma = require('../lib/prisma')
 
 const SEAPORT_ADDRESS = '0x0000000000000068F116a894984e2DB1123eB395'
+const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+
 const slugCache = new Map()
+const feesCache = new Map()
 
 async function resolveSlug(contractAddress) {
   if (slugCache.has(contractAddress)) return slugCache.get(contractAddress)
@@ -17,6 +20,38 @@ async function resolveSlug(contractAddress) {
   if (!slug) throw new Error(`Slug introuvable pour ${contractAddress}`)
   slugCache.set(contractAddress, slug)
   return slug
+}
+
+// Retourne [{recipient, basisPoints}] pour OpenSea + creator fees
+async function getCollectionFees(slug) {
+  if (feesCache.has(slug)) return feesCache.get(slug)
+
+  const res = await axios.get(
+    `https://api.opensea.io/api/v2/collections/${slug}`,
+    { headers: { 'x-api-key': process.env.OPENSEA_API_KEY }, timeout: 10000 }
+  )
+
+  const fees = (res.data.fees || []).map(f => ({
+    recipient: f.recipient,
+    basisPoints: f.fee  // ex: 250 = 2.5%
+  }))
+
+  feesCache.set(slug, fees)
+  return fees
+}
+
+function buildConsideration(offerAmountWeiBI, fees) {
+  return fees.map(({ recipient, basisPoints }) => {
+    const amount = (offerAmountWeiBI * BigInt(basisPoints) / 10000n).toString()
+    return {
+      itemType: 1,
+      token: WETH,
+      identifierOrCriteria: '0',
+      startAmount: amount,
+      endAmount: amount,
+      recipient
+    }
+  })
 }
 
 async function placeOffer({ wallet, userId, collection, offerPrice, floorPrice, isPaperTrade, expiryMinutes = 1440 }) {
@@ -33,7 +68,9 @@ async function placeOffer({ wallet, userId, collection, offerPrice, floorPrice, 
   try {
     const slug = await resolveSlug(collection)
     const offerAmountWei = ethers.parseEther(offerPrice.toString()).toString()
+    const offerAmountWeiBI = BigInt(offerAmountWei)
     const expireTimestamp = Math.floor(expiresAt.getTime() / 1000).toString()
+    const startTime = Math.floor(Date.now() / 1000).toString()
 
     const buildRes = await axios.post(
       'https://api.opensea.io/api/v2/offers/build',
@@ -48,29 +85,9 @@ async function placeOffer({ wallet, userId, collection, offerPrice, floorPrice, 
 
     const partial = buildRes.data.partialParameters
 
-    const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-    const OPENSEA_FEE_RECIPIENT = '0x0000a26b00c1F0DF003000390027140000fAa719'
-    const startTime = Math.floor(Date.now() / 1000).toString()
-
-    // OpenSea fee = 1% (100 basis points)
-    const offerAmountWeiBI = BigInt(offerAmountWei)
-    const openseaFee = (offerAmountWeiBI * 100n / 10000n).toString()
-
-    const openseaFeeItem = {
-      itemType: 1,
-      token: WETH,
-      identifierOrCriteria: '0',
-      startAmount: openseaFee,
-      endAmount: openseaFee,
-      recipient: OPENSEA_FEE_RECIPIENT
-    }
-
-    // Utilise la consideration de l'API + ajoute le fee si absent
-    const existingConsideration = partial.consideration || []
-    const hasFee = existingConsideration.some(
-      c => c.recipient?.toLowerCase() === OPENSEA_FEE_RECIPIENT.toLowerCase()
-    )
-    const consideration = hasFee ? existingConsideration : [...existingConsideration, openseaFeeItem]
+    // Récupère OpenSea fees + creator fees depuis l'API collection
+    const fees = await getCollectionFees(slug)
+    const consideration = buildConsideration(offerAmountWeiBI, fees)
 
     const orderParams = {
       offerer: wallet.address,
