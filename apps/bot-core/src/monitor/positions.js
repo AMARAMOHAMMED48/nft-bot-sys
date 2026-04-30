@@ -152,17 +152,24 @@ async function recoverUnlisted({ wallet, user }) {
   const pending = await prisma.trade.findMany({
     where: { userId: user.id, status: 'bought', listedAt: null, isPaperTrade: user.paperTrading }
   })
-  if (!pending.length) return
+  if (!pending.length) {
+    console.log('[recovery] Aucun trade orphelin trouvé')
+    return
+  }
+
+  console.log(`[recovery] ${pending.length} trade(s) orphelin(s) détecté(s)`)
 
   for (const trade of pending) {
     const floor = getFloor(trade.collection)
     if (!floor) {
+      console.log(`[recovery][warn] Floor introuvable pour ${trade.collection} #${trade.tokenId} — listing différé`)
       await prisma.botLog.create({
         data: { userId: user.id, level: 'warn', module: 'positions', message: `Recovery: floor introuvable pour ${trade.collection} #${trade.tokenId} — listing différé` }
       })
       continue
     }
 
+    console.log(`[recovery][info] Re-listing ${trade.collection} #${trade.tokenId} à ${floor} ETH`)
     await prisma.botLog.create({
       data: { userId: user.id, level: 'info', module: 'positions', message: `Recovery: re-listing ${trade.collection} #${trade.tokenId} à ${floor} ETH` }
     })
