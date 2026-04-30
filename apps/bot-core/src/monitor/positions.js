@@ -147,6 +147,57 @@ async function handleNewNFT({ wallet, user, collection, tokenId }) {
   ].join('\n'))
 }
 
+// Réconcilie wallet vs DB — crée les trades manquants si NFT présent sans trade
+async function recoverMissingTrades({ wallet, user }) {
+  const collections = await prisma.userCollection.findMany({
+    where: { userId: user.id, enabled: true },
+    select: { collectionAddress: true }
+  })
+  if (!collections.length) return
+
+  const addresses = collections.map(c => c.collectionAddress)
+  const nfts = (await fetchWalletNFTs(user.walletAddress, addresses)).filter(n => n.contract?.address && n.tokenId)
+
+  for (const nft of nfts) {
+    const collection = nft.contract.address.toLowerCase()
+    const tokenId = nft.tokenId
+
+    const existing = await prisma.trade.findFirst({
+      where: { userId: user.id, tokenId, collection, status: { in: ['bought', 'listed'] } }
+    })
+    if (existing) continue
+
+    console.log(`[recovery][warn] NFT ${collection} #${tokenId} dans wallet sans trade — création`)
+
+    const offer = await prisma.offer.findFirst({
+      where: { userId: user.id, collection: { equals: collection, mode: 'insensitive' } },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    const buyPrice = offer?.offerPrice ?? 0
+
+    const trade = await prisma.trade.create({
+      data: { userId: user.id, tokenId, collection, source: 'offer_accepted', buyPrice, status: 'bought', isPaperTrade: user.paperTrading }
+    })
+
+    if (offer && offer.status !== 'accepted') {
+      await prisma.offer.update({ where: { id: offer.id }, data: { status: 'accepted', acceptedAt: new Date() } })
+    }
+
+    await prisma.botLog.create({
+      data: { userId: user.id, level: 'warn', module: 'positions', message: `Recovery: trade créé pour ${collection} #${tokenId} (achat: ${buyPrice} ETH)` }
+    })
+
+    const floor = getFloor(collection)
+    if (floor) {
+      console.log(`[recovery][info] Listing ${collection} #${tokenId} à ${floor} ETH`)
+      await listToken({ wallet, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+    } else {
+      console.log(`[recovery][warn] Floor introuvable pour ${collection} #${tokenId} — listing différé`)
+    }
+  }
+}
+
 // Reliste les trades bought non listés (crash/deploy entre achat et listing)
 async function recoverUnlisted({ wallet, user }) {
   const pending = await prisma.trade.findMany({
@@ -186,7 +237,9 @@ async function recoverUnlisted({ wallet, user }) {
 }
 
 function startPositionMonitor(ctx) {
-  // Reliste les positions orphelines avant le premier cycle
+  // 1. NFTs dans wallet sans trade en DB
+  recoverMissingTrades(ctx).catch(() => {})
+  // 2. Trades bought sans listing
   recoverUnlisted(ctx).catch(() => {})
   // Vérifie toutes les 30s
   setInterval(() => checkNewPositions(ctx), 30_000)
