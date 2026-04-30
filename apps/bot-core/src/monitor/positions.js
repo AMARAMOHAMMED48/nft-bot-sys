@@ -23,7 +23,8 @@ async function fetchWalletNFTs(walletAddress, collections) {
       }
     )
     return res.data.ownedNfts || []
-  } catch {
+  } catch (err) {
+    console.log(`[positions][error] Alchemy fetchWalletNFTs: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
     return []
   }
 }
@@ -39,7 +40,8 @@ async function fetchAllWalletNFTs(walletAddress) {
       }
     )
     return res.data.ownedNfts || []
-  } catch {
+  } catch (err) {
+    console.log(`[recovery][error] Alchemy fetchAllWalletNFTs: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
     return []
   }
 }
