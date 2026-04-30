@@ -133,6 +133,7 @@ function pct(price, floor) {
 }
 
 async function log(userId, level, module, message) {
+  console.log(`[${level}][${module}] ${message}`)
   await prisma.botLog.create({ data: { userId, level, module, message } })
 }
 
