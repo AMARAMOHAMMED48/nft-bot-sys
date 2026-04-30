@@ -12,9 +12,9 @@ type Status = {
 }
 
 type Config = {
-  offerPriceEth: number | null
+  offerBelowFloorPct: number | null
   budgetMaxEth: number
-  stopLossEth: number
+  stopLossPct: number
   paperTrading: boolean
 }
 
@@ -175,7 +175,7 @@ export default function DashboardPage() {
               </button>
             )}
             <span style={{ fontSize: 13, color: '#94a3b8' }}>
-              Budget: {config.budgetMaxEth} ETH max | Stop-loss: -{config.stopLossEth} ETH
+              Budget: {config.budgetMaxEth} ETH max | Stop-loss: -{config.stopLossPct}%
             </span>
           </div>
         </Section>

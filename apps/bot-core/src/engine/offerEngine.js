@@ -10,8 +10,8 @@ async function runOfferCycle(ctx) {
   const { id: userId, offerMaxActive, maxGasGwei, paperTrading } = user
   const offerExpiryMin = user.offerExpiryMin ?? 1440
 
-  if (!user.offerBelowFloor) {
-    await log(userId, 'warn', 'offer', 'offerBelowFloor non configuré — bot inactif')
+  if (!user.offerBelowFloorPct) {
+    await log(userId, 'warn', 'offer', 'offerBelowFloorPct non configuré — bot inactif')
     return
   }
 
@@ -58,13 +58,13 @@ async function runOfferCycle(ctx) {
     const floor = getFloor(col.collectionAddress)
     if (!floor) continue
 
-    // Prix : floor - offerBelowFloor (dynamique) OU prix fixe OU config collection
-    const belowFloor = col.offerBelowFloor ?? user.offerBelowFloor
-    const expiry     = col.offerExpiryMin ?? offerExpiryMin
+    const belowFloorPct = col.offerBelowFloorPct ?? user.offerBelowFloorPct
+    const expiry        = col.offerExpiryMin ?? offerExpiryMin
 
-    const price = parseFloat((floor - belowFloor).toFixed(4))
+    // Prix = floor × (1 - pct/100), ex: floor=1, pct=5 → 0.95 ETH
+    const price = parseFloat((floor * (1 - belowFloorPct / 100)).toFixed(4))
     if (price <= 0) {
-      await log(userId, 'warn', 'offer', `Prix négatif (floor ${floor} - ${belowFloor} = ${price}) — offre ignorée pour ${col.collectionName}`)
+      await log(userId, 'warn', 'offer', `Prix invalide (floor ${floor} × ${100 - belowFloorPct}% = ${price}) — offre ignorée pour ${col.collectionName}`)
       continue
     }
 

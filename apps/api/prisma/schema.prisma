@@ -16,11 +16,11 @@ model User {
   walletAddress  String?
   walletKeyEnc   String?
   // Config bot par user
-  paperTrading    Boolean          @default(true)
-  offerBelowFloor Float?
-  offerMaxActive  Int              @default(5)
-  budgetMaxEth    Float            @default(1.0)
-  stopLossEth     Float            @default(0.15)
+  paperTrading       Boolean          @default(true)
+  offerBelowFloorPct Float?
+  offerMaxActive     Int              @default(5)
+  budgetMaxEth       Float            @default(1.0)
+  stopLossPct        Float            @default(10)
   maxGasGwei      Int              @default(35)
   offerExpiryMin  Int              @default(1440)
   listExpiryMin   Int              @default(10080)
@@ -41,8 +41,9 @@ model UserCollection {
   collectionName    String
   enabled           Boolean  @default(true)
   // Config optionnelle par collection (override config globale si renseignée)
-  offerBelowFloor   Float?
-  offerExpiryMin    Int?
+  offerBelowFloorPct Float?
+  stopLossPct        Float?
+  offerExpiryMin     Int?
   createdAt         DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

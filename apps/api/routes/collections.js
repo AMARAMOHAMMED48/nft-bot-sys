@@ -32,10 +32,11 @@ router.post('/', async (req, res) => {
 })
 
 router.patch('/:id', async (req, res) => {
-  const { enabled, offerPriceEth, offerExpiryMin } = req.body
+  const { enabled, offerBelowFloorPct, stopLossPct, offerExpiryMin } = req.body
   const data = {}
   if (enabled !== undefined) data.enabled = enabled
-  if (offerPriceEth !== undefined) data.offerPriceEth = offerPriceEth === '' ? null : parseFloat(offerPriceEth)
+  if (offerBelowFloorPct !== undefined) data.offerBelowFloorPct = offerBelowFloorPct === '' ? null : parseFloat(offerBelowFloorPct)
+  if (stopLossPct !== undefined) data.stopLossPct = stopLossPct === '' ? null : parseFloat(stopLossPct)
   if (offerExpiryMin !== undefined) data.offerExpiryMin = offerExpiryMin === '' ? null : parseInt(offerExpiryMin)
 
   try {
