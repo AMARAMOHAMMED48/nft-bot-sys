@@ -108,9 +108,11 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
       ...feeItems
     ]
 
-    const orderParams = {
+    const SIGNED_ZONE = '0x000056f7000000ece9003ca63978907a00ffd100'
+
+    const buildOrder = (orderType, zone) => ({
       offerer:    wallet.address,
-      zone:       ethers.ZeroAddress,
+      zone,
       offer: [{
         itemType: 2,  // ERC721
         token: collection,
@@ -119,7 +121,7 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
         endAmount:   '1'
       }],
       consideration,
-      orderType:  0,  // FULL_OPEN
+      orderType,
       startTime,
       endTime,
       zoneHash:   ethers.ZeroHash,
@@ -127,16 +129,32 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
       conduitKey: OPENSEA_CONDUIT,
       totalOriginalConsiderationItems: consideration.length,
       counter:    '0'
-    }
+    })
 
     const domain = { name: 'Seaport', version: '1.6', chainId: 1, verifyingContract: SEAPORT_ADDRESS }
-    const signature = await wallet.signTypedData(domain, SEAPORT_TYPES, orderParams)
 
-    const submitRes = await axios.post(
-      'https://api.opensea.io/api/v2/orders/ethereum/seaport/listings',
-      { parameters: orderParams, signature, protocol_address: SEAPORT_ADDRESS },
-      { headers: { 'x-api-key': process.env.OPENSEA_API_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
-    )
+    const trySubmit = async (orderType, zone) => {
+      const orderParams = buildOrder(orderType, zone)
+      const signature = await wallet.signTypedData(domain, SEAPORT_TYPES, orderParams)
+      return axios.post(
+        'https://api.opensea.io/api/v2/orders/ethereum/seaport/listings',
+        { parameters: orderParams, signature, protocol_address: SEAPORT_ADDRESS },
+        { headers: { 'x-api-key': process.env.OPENSEA_API_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
+      )
+    }
+
+    let submitRes
+    try {
+      submitRes = await trySubmit(0, ethers.ZeroAddress)  // FULL_OPEN
+    } catch (firstErr) {
+      const firstMsg = firstErr.response?.data?.errors?.[0] || firstErr.message
+      if (firstMsg?.includes('Signed Zone')) {
+        console.log(`[lister] Collection requiert SignedZone — retry FULL_RESTRICTED`)
+        submitRes = await trySubmit(2, SIGNED_ZONE)       // FULL_RESTRICTED
+      } else {
+        throw firstErr
+      }
+    }
 
     const orderId = submitRes.data.listing?.order_hash ?? submitRes.data.order?.order_hash
 
