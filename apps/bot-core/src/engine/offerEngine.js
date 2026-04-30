@@ -62,7 +62,7 @@ async function runOfferCycle(ctx) {
     const belowFloor = col.offerBelowFloor ?? user.offerBelowFloor
     const expiry     = col.offerExpiryMin ?? offerExpiryMin
 
-    const price = parseFloat((floor - belowFloor).toFixed(6))
+    const price = parseFloat((floor - belowFloor).toFixed(4))
     if (price <= 0) {
       await log(userId, 'warn', 'offer', `Prix négatif (floor ${floor} - ${belowFloor} = ${price}) — offre ignorée pour ${col.collectionName}`)
       continue
