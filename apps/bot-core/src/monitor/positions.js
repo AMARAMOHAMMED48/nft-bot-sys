@@ -39,7 +39,12 @@ async function fetchAllWalletNFTs(walletAddress) {
         timeout: 10000
       }
     )
-    return res.data.ownedNfts || []
+    const nfts = res.data.ownedNfts || []
+    console.log(`[recovery][alchemy] totalCount=${res.data.totalCount} ownedNfts=${nfts.length} keys=${Object.keys(res.data).join(',')}`)
+    if (nfts.length === 0 && res.data.totalCount > 0) {
+      console.log(`[recovery][alchemy] totalCount>0 mais ownedNfts vide — réponse brute:`, JSON.stringify(res.data).slice(0, 500))
+    }
+    return nfts
   } catch (err) {
     console.log(`[recovery][error] Alchemy fetchAllWalletNFTs: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
     return []
