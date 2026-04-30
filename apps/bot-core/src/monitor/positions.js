@@ -153,7 +153,7 @@ async function recoverMissingTrades({ wallet, user }) {
     if (floor) {
       console.log(`[recovery][info] Listing ${collection} #${tokenId} à ${floor} ETH`)
       try {
-        await listToken({ wallet, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+        await listToken({ wallet, user, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
       } catch (err) {
         const msg = err.response?.data?.errors?.[0] || err.message
         console.log(`[recovery][error] Échec listing ${collection} #${tokenId}: ${msg}`)
@@ -194,7 +194,7 @@ async function recoverUnlisted({ wallet, user }) {
       data: { userId: user.id, level: 'info', module: 'positions', message: `Recovery: re-listing ${trade.collection} #${trade.tokenId} à ${floor} ETH` }
     })
 
-    await listToken({ wallet, tradeId: trade.id, collection: trade.collection, tokenId: trade.tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+    await listToken({ wallet, user, tradeId: trade.id, collection: trade.collection, tokenId: trade.tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
   }
 }
 

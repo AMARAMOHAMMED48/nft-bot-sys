@@ -1,6 +1,7 @@
 const axios = require('axios')
 const { ethers } = require('ethers')
 const prisma = require('../lib/prisma')
+const { notify } = require('../notify')
 
 const SEAPORT_ADDRESS  = '0x0000000000000068F116a894984e2DB1123eB395'
 const OPENSEA_CONDUIT  = '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000'
@@ -61,12 +62,15 @@ async function getAllFees(collectionAddress) {
   }
 }
 
-async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 10080 }) {
+async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 10080 }) {
+  const label = isPaperTrade ? ' [PAPER]' : ''
+
   if (isPaperTrade) {
     await prisma.trade.update({
       where: { id: tradeId },
       data: { listPrice, status: 'listed', listedAt: new Date() }
     })
+    if (user) await notify(user, `📋 LISTING${label} | ${collection} #${tokenId}\nPrix: ${listPrice} ETH`)
     return { txHash: null }
   }
 
@@ -164,6 +168,7 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
     })
 
     console.log(`[lister] ✅ Listé ${collection} #${tokenId} à ${listPrice} ETH | order: ${orderId}`)
+    if (user) await notify(user, `📋 LISTING${label} | ${collection} #${tokenId}\nPrix: ${listPrice} ETH | Order: ${orderId?.slice(0, 10)}...`)
     return { txHash: orderId }
 
   } catch (err) {
