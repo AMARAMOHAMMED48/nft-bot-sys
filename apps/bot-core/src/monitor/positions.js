@@ -124,7 +124,10 @@ async function recoverMissingTrades({ wallet, user }) {
     const existing = await prisma.trade.findFirst({
       where: { userId: user.id, tokenId, collection, status: { in: ['bought', 'listed'] } }
     })
-    if (existing) continue
+    if (existing) {
+      console.log(`[recovery] Trade existant pour ${collection} #${tokenId} — status: ${existing.status}`)
+      continue
+    }
 
     console.log(`[recovery][warn] NFT ${collection} #${tokenId} sans trade en DB — création`)
 
@@ -149,7 +152,15 @@ async function recoverMissingTrades({ wallet, user }) {
     const floor = getFloor(collection)
     if (floor) {
       console.log(`[recovery][info] Listing ${collection} #${tokenId} à ${floor} ETH`)
-      await listToken({ wallet, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+      try {
+        await listToken({ wallet, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+      } catch (err) {
+        const msg = err.response?.data?.errors?.[0] || err.message
+        console.log(`[recovery][error] Échec listing ${collection} #${tokenId}: ${msg}`)
+        await prisma.botLog.create({
+          data: { userId: user.id, level: 'error', module: 'positions', message: `Recovery: échec listing ${tokenId}: ${msg}` }
+        })
+      }
     } else {
       console.log(`[recovery][warn] Floor introuvable pour ${collection} #${tokenId} — listing différé`)
     }
@@ -187,9 +198,13 @@ async function recoverUnlisted({ wallet, user }) {
   }
 }
 
+async function runRecovery(ctx) {
+  try { await recoverMissingTrades(ctx) } catch (err) { console.log(`[recovery][error] recoverMissingTrades: ${err.message}`) }
+  try { await recoverUnlisted(ctx) } catch (err) { console.log(`[recovery][error] recoverUnlisted: ${err.message}`) }
+}
+
 function startPositionMonitor(ctx) {
-  recoverMissingTrades(ctx).catch(() => {})
-  recoverUnlisted(ctx).catch(() => {})
+  runRecovery(ctx)
   setInterval(() => checkNewPositions(ctx), 30_000)
   checkNewPositions(ctx)
 }
