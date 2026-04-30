@@ -18,8 +18,23 @@ async function fetchWalletNFTs(walletAddress, collections) {
           withMetadata: false,
           pageSize: 100
         },
-        // ajoute contractAddresses comme query string manuellement
         paramsSerializer: () => `owner=${walletAddress}&withMetadata=false&pageSize=100&${contractAddresses}`,
+        timeout: 10000
+      }
+    )
+    return res.data.ownedNfts || []
+  } catch {
+    return []
+  }
+}
+
+// Récupère tous les NFTs du wallet sans filtre (pour la recovery)
+async function fetchAllWalletNFTs(walletAddress) {
+  try {
+    const res = await axios.get(
+      `https://eth-mainnet.g.alchemy.com/nft/v3/${process.env.ALCHEMY_API_KEY}/getNFTsForOwner`,
+      {
+        params: { owner: walletAddress, withMetadata: false, pageSize: 100 },
         timeout: 10000
       }
     )
@@ -36,8 +51,9 @@ async function checkNewPositions({ wallet, user }) {
   })
   if (!collections.length) return
 
-  const addresses = collections.map(c => c.collectionAddress)
-  const nfts = (await fetchWalletNFTs(user.walletAddress, addresses)).filter(n => n.contract?.address && n.tokenId)
+  const addressSet = new Set(collections.map(c => c.collectionAddress.toLowerCase()))
+  const allNfts = (await fetchAllWalletNFTs(user.walletAddress)).filter(n => n.contract?.address && n.tokenId)
+  const nfts = allNfts.filter(n => addressSet.has(n.contract.address.toLowerCase()))
 
   const walletKey = user.walletAddress
   if (!knownPositions.has(walletKey)) {
@@ -155,9 +171,13 @@ async function recoverMissingTrades({ wallet, user }) {
   })
   if (!collections.length) return
 
-  const addresses = collections.map(c => c.collectionAddress)
-  const nfts = (await fetchWalletNFTs(user.walletAddress, addresses)).filter(n => n.contract?.address && n.tokenId)
-  console.log(`[recovery] Wallet scan — ${nfts.length} NFT(s) trouvé(s) dans les collections surveillées`)
+  const addresses = new Set(collections.map(c => c.collectionAddress.toLowerCase()))
+
+  // Fetch sans filtre pour éviter les problèmes de format de query Alchemy
+  const allNfts = (await fetchAllWalletNFTs(user.walletAddress)).filter(n => n.contract?.address && n.tokenId)
+  const nfts = allNfts.filter(n => addresses.has(n.contract.address.toLowerCase()))
+
+  console.log(`[recovery] Wallet scan — ${allNfts.length} NFT(s) total, ${nfts.length} dans les collections surveillées`)
 
   for (const nft of nfts) {
     const collection = nft.contract.address.toLowerCase()
