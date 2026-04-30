@@ -85,9 +85,14 @@ async function placeOffer({ wallet, userId, collection, offerPrice, floorPrice, 
 
     const partial = buildRes.data.partialParameters
 
-    // Récupère OpenSea fees + creator fees depuis l'API collection
+    // Item NFT/criteria du build (item non-currency requis par Seaport)
+    const nftItems = partial.consideration || []
+
+    // Fees (OpenSea + creator) calculés depuis l'API collection
     const fees = await getCollectionFees(slug)
-    const consideration = buildConsideration(offerAmountWeiBI, fees)
+    const feeItems = buildConsideration(offerAmountWeiBI, fees)
+
+    const consideration = [...nftItems, ...feeItems]
 
     const orderParams = {
       offerer: wallet.address,
