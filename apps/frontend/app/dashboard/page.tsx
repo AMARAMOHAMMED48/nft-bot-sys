@@ -138,10 +138,10 @@ export default function DashboardPage() {
                     {f.floorPrice !== null ? `${f.floorPrice} ETH` : '—'}
                   </p>
 
-                  {config.offerPriceEth && f.floorPrice && (
+                  {config.offerBelowFloorPct != null && f.floorPrice && (
                     <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
-                      Offre: {config.offerPriceEth} ETH
-                      ({((config.offerPriceEth / f.floorPrice) * 100).toFixed(1)}% du floor)
+                      Offre: {(f.floorPrice * (1 - config.offerBelowFloorPct / 100)).toFixed(4)} ETH
+                      (-{config.offerBelowFloorPct}% floor)
                     </p>
                   )}
 
