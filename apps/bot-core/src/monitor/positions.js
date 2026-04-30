@@ -185,6 +185,8 @@ async function recoverMissingTrades({ wallet, user }) {
   const nfts = allNfts.filter(n => addresses.has(n.contract.address.toLowerCase()))
 
   console.log(`[recovery] Wallet scan — ${allNfts.length} NFT(s) total, ${nfts.length} dans les collections surveillées`)
+  console.log(`[recovery] Adresses DB: ${[...addresses].join(', ')}`)
+  console.log(`[recovery] Contrats wallet: ${[...new Set(allNfts.map(n => n.contract.address.toLowerCase()))].join(', ')}`)
 
   for (const nft of nfts) {
     const collection = nft.contract.address.toLowerCase()
