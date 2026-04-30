@@ -37,7 +37,7 @@ async function checkNewPositions({ wallet, user }) {
   if (!collections.length) return
 
   const addresses = collections.map(c => c.collectionAddress)
-  const nfts = await fetchWalletNFTs(user.walletAddress, addresses)
+  const nfts = (await fetchWalletNFTs(user.walletAddress, addresses)).filter(n => n.contract?.address && n.tokenId)
 
   const walletKey = user.walletAddress
   if (!knownPositions.has(walletKey)) {
