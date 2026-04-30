@@ -74,15 +74,18 @@ async function runOfferCycle(ctx) {
     })
 
     if (existingOffer) {
+      // Prix identique → rien à faire (évite boucle infinie quand toFixed arrondit au-dessus du floor)
+      if (existingOffer.offerPrice === price) continue
+
       const needsUpdate =
-        existingOffer.offerPrice >= floor ||           // offre au-dessus ou égal au floor → danger
+        existingOffer.offerPrice > floor * 1.02 ||    // offre > 2% au-dessus du floor → danger réel
         Math.abs(existingOffer.offerPrice - price) / floor > 0.01  // écart > 1% du floor → re-sync
 
       if (needsUpdate) {
         await cancelOffer({ wallet, offerId: existingOffer.id, isPaperTrade: paperTrading })
         await log(userId, 'info', 'offer', `Offre re-sync ${existingOffer.offerPrice} → ${price} ETH (floor: ${floor}) sur ${col.collectionName}`)
       } else {
-        continue // Offre toujours valide, rien à faire
+        continue
       }
     }
 
