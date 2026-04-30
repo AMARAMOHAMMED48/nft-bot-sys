@@ -3,9 +3,8 @@ const { getFloor } = require('../data/floorPrice')
 const { notify } = require('../notify')
 
 async function checkStopLoss(user) {
-  const stopLossPct = user.stopLossPct ?? 10
+  const globalStopLossPct = user.stopLossPct ?? 10
 
-  // Vérifier chaque trade actif (bought/listed) : si floor < buyPrice × (1 - stopLossPct/100)
   const activeTrades = await prisma.trade.findMany({
     where: { userId: user.id, status: { in: ['bought', 'listed'] } }
   })
@@ -13,6 +12,13 @@ async function checkStopLoss(user) {
   for (const trade of activeTrades) {
     const floor = getFloor(trade.collection)
     if (!floor) continue
+
+    // Config par collection → fallback global
+    const colConfig = await prisma.userCollection.findFirst({
+      where: { userId: user.id, collectionAddress: { equals: trade.collection, mode: 'insensitive' } },
+      select: { stopLossPct: true }
+    })
+    const stopLossPct = colConfig?.stopLossPct ?? globalStopLossPct
 
     const stopPrice = parseFloat((trade.buyPrice * (1 - stopLossPct / 100)).toFixed(4))
     if (floor <= stopPrice) {
