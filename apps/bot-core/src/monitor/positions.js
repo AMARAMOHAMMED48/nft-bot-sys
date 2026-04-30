@@ -7,29 +7,7 @@ const { notify } = require('../notify')
 // walletAddress → Set of "collection:tokenId" déjà connus
 const knownPositions = new Map()
 
-async function fetchWalletNFTs(walletAddress, collections) {
-  try {
-    const contractAddresses = collections.map(c => `contractAddresses[]=${c}`).join('&')
-    const res = await axios.get(
-      `https://eth-mainnet.g.alchemy.com/nft/v3/${process.env.ALCHEMY_API_KEY}/getNFTsForOwner`,
-      {
-        params: {
-          owner: walletAddress,
-          withMetadata: false,
-          pageSize: 100
-        },
-        paramsSerializer: () => `owner=${walletAddress}&withMetadata=false&pageSize=100&${contractAddresses}`,
-        timeout: 10000
-      }
-    )
-    return res.data.ownedNfts || []
-  } catch (err) {
-    console.log(`[positions][error] Alchemy fetchWalletNFTs: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
-    return []
-  }
-}
-
-// Récupère tous les NFTs du wallet sans filtre (pour la recovery)
+// Alchemy v3 avec withMetadata:false retourne { contractAddress, tokenId, balance }
 async function fetchAllWalletNFTs(walletAddress) {
   try {
     const res = await axios.get(
@@ -39,14 +17,9 @@ async function fetchAllWalletNFTs(walletAddress) {
         timeout: 10000
       }
     )
-    const nfts = res.data.ownedNfts || []
-    console.log(`[recovery][alchemy] totalCount=${res.data.totalCount} ownedNfts=${nfts.length}`)
-    if (nfts.length > 0) {
-      console.log(`[recovery][alchemy] structure NFT[0]:`, JSON.stringify(nfts[0]).slice(0, 400))
-    }
-    return nfts
+    return (res.data.ownedNfts || []).filter(n => n.contractAddress && n.tokenId)
   } catch (err) {
-    console.log(`[recovery][error] Alchemy fetchAllWalletNFTs: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
+    console.log(`[positions][error] Alchemy: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
     return []
   }
 }
@@ -59,13 +32,12 @@ async function checkNewPositions({ wallet, user }) {
   if (!collections.length) return
 
   const addressSet = new Set(collections.map(c => c.collectionAddress.toLowerCase()))
-  const allNfts = (await fetchAllWalletNFTs(user.walletAddress)).filter(n => n.contract?.address && n.tokenId)
-  const nfts = allNfts.filter(n => addressSet.has(n.contract.address.toLowerCase()))
+  const allNfts = await fetchAllWalletNFTs(user.walletAddress)
+  const nfts = allNfts.filter(n => addressSet.has(n.contractAddress.toLowerCase()))
 
   const walletKey = user.walletAddress
   if (!knownPositions.has(walletKey)) {
-    // Premier check — initialise sans déclencher de listing
-    const initial = new Set(nfts.map(n => `${n.contract.address}:${n.tokenId}`))
+    const initial = new Set(nfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
     knownPositions.set(walletKey, initial)
     return
   }
@@ -73,77 +45,45 @@ async function checkNewPositions({ wallet, user }) {
   const known = knownPositions.get(walletKey)
 
   for (const nft of nfts) {
-    const key = `${nft.contract.address.toLowerCase()}:${nft.tokenId}`
+    const key = `${nft.contractAddress.toLowerCase()}:${nft.tokenId}`
     if (known.has(key)) continue
 
-    // Nouveau NFT détecté !
     known.add(key)
-    const collection = nft.contract.address.toLowerCase()
-    const tokenId = nft.tokenId
-
-    await handleNewNFT({ wallet, user, collection, tokenId })
+    await handleNewNFT({ wallet, user, collection: nft.contractAddress.toLowerCase(), tokenId: nft.tokenId })
   }
 
   // Nettoie les positions vendues
-  const current = new Set(nfts.map(n => `${n.contract.address.toLowerCase()}:${n.tokenId}`))
+  const current = new Set(nfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
   for (const key of known) {
-    if (!current.has(key)) {
-      known.delete(key)
-      // NFT disparu → vendu → géré par le sale poller
-    }
+    if (!current.has(key)) known.delete(key)
   }
 }
 
 async function handleNewNFT({ wallet, user, collection, tokenId }) {
-  // Cherche une offre active correspondante
   const offer = await prisma.offer.findFirst({
-    where: {
-      userId: user.id,
-      collection: { equals: collection, mode: 'insensitive' },
-      status: 'active'
-    },
+    where: { userId: user.id, collection: { equals: collection, mode: 'insensitive' }, status: 'active' },
     orderBy: { createdAt: 'desc' }
   })
 
   const buyPrice = offer?.offerPrice ?? 0
 
-  // Vérifie si un trade existe déjà pour ce token
   const existing = await prisma.trade.findFirst({
     where: { userId: user.id, tokenId, collection, status: { in: ['bought', 'listed'] } }
   })
   if (existing) return
 
-  // Marque l'offre comme acceptée
   if (offer) {
-    await prisma.offer.update({
-      where: { id: offer.id },
-      data: { status: 'accepted', acceptedAt: new Date() }
-    })
+    await prisma.offer.update({ where: { id: offer.id }, data: { status: 'accepted', acceptedAt: new Date() } })
   }
 
-  // Crée le trade
   const trade = await prisma.trade.create({
-    data: {
-      userId: user.id,
-      tokenId,
-      collection,
-      source: 'offer_accepted',
-      buyPrice,
-      status: 'bought',
-      isPaperTrade: user.paperTrading
-    }
+    data: { userId: user.id, tokenId, collection, source: 'offer_accepted', buyPrice, status: 'bought', isPaperTrade: user.paperTrading }
   })
 
   await prisma.botLog.create({
-    data: {
-      userId: user.id,
-      level: 'info',
-      module: 'positions',
-      message: `NFT détecté dans wallet: ${collection} #${tokenId} — listing automatique`
-    }
+    data: { userId: user.id, level: 'info', module: 'positions', message: `NFT détecté: ${collection} #${tokenId} — listing automatique` }
   })
 
-  // Listing automatique au floor price
   const floor = getFloor(collection)
   if (!floor) {
     await prisma.botLog.create({
@@ -152,14 +92,7 @@ async function handleNewNFT({ wallet, user, collection, tokenId }) {
     return
   }
 
-  await listToken({
-    wallet,
-    tradeId: trade.id,
-    collection,
-    tokenId,
-    listPrice: floor,
-    isPaperTrade: user.paperTrading
-  })
+  await listToken({ wallet, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
 
   const profit = floor - buyPrice
   const label = user.paperTrading ? '[PAPER]' : ''
@@ -179,17 +112,13 @@ async function recoverMissingTrades({ wallet, user }) {
   if (!collections.length) return
 
   const addresses = new Set(collections.map(c => c.collectionAddress.toLowerCase()))
-
-  // Fetch sans filtre pour éviter les problèmes de format de query Alchemy
-  const allNfts = (await fetchAllWalletNFTs(user.walletAddress)).filter(n => n.contract?.address && n.tokenId)
-  const nfts = allNfts.filter(n => addresses.has(n.contract.address.toLowerCase()))
+  const allNfts = await fetchAllWalletNFTs(user.walletAddress)
+  const nfts = allNfts.filter(n => addresses.has(n.contractAddress.toLowerCase()))
 
   console.log(`[recovery] Wallet scan — ${allNfts.length} NFT(s) total, ${nfts.length} dans les collections surveillées`)
-  console.log(`[recovery] Adresses DB: ${[...addresses].join(', ')}`)
-  console.log(`[recovery] Contrats wallet: ${[...new Set(allNfts.map(n => n.contract.address.toLowerCase()))].join(', ')}`)
 
   for (const nft of nfts) {
-    const collection = nft.contract.address.toLowerCase()
+    const collection = nft.contractAddress.toLowerCase()
     const tokenId = nft.tokenId
 
     const existing = await prisma.trade.findFirst({
@@ -197,13 +126,12 @@ async function recoverMissingTrades({ wallet, user }) {
     })
     if (existing) continue
 
-    console.log(`[recovery][warn] NFT ${collection} #${tokenId} dans wallet sans trade — création`)
+    console.log(`[recovery][warn] NFT ${collection} #${tokenId} sans trade en DB — création`)
 
     const offer = await prisma.offer.findFirst({
       where: { userId: user.id, collection: { equals: collection, mode: 'insensitive' } },
       orderBy: { createdAt: 'desc' }
     })
-
     const buyPrice = offer?.offerPrice ?? 0
 
     const trade = await prisma.trade.create({
@@ -245,7 +173,7 @@ async function recoverUnlisted({ wallet, user }) {
     if (!floor) {
       console.log(`[recovery][warn] Floor introuvable pour ${trade.collection} #${trade.tokenId} — listing différé`)
       await prisma.botLog.create({
-        data: { userId: user.id, level: 'warn', module: 'positions', message: `Recovery: floor introuvable pour ${trade.collection} #${trade.tokenId} — listing différé` }
+        data: { userId: user.id, level: 'warn', module: 'positions', message: `Recovery: floor introuvable pour ${trade.collection} #${trade.tokenId}` }
       })
       continue
     }
@@ -255,23 +183,13 @@ async function recoverUnlisted({ wallet, user }) {
       data: { userId: user.id, level: 'info', module: 'positions', message: `Recovery: re-listing ${trade.collection} #${trade.tokenId} à ${floor} ETH` }
     })
 
-    await listToken({
-      wallet,
-      tradeId: trade.id,
-      collection: trade.collection,
-      tokenId: trade.tokenId,
-      listPrice: floor,
-      isPaperTrade: user.paperTrading
-    })
+    await listToken({ wallet, tradeId: trade.id, collection: trade.collection, tokenId: trade.tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
   }
 }
 
 function startPositionMonitor(ctx) {
-  // 1. NFTs dans wallet sans trade en DB
   recoverMissingTrades(ctx).catch(() => {})
-  // 2. Trades bought sans listing
   recoverUnlisted(ctx).catch(() => {})
-  // Vérifie toutes les 30s
   setInterval(() => checkNewPositions(ctx), 30_000)
   checkNewPositions(ctx)
 }
