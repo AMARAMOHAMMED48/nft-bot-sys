@@ -147,7 +147,40 @@ async function handleNewNFT({ wallet, user, collection, tokenId }) {
   ].join('\n'))
 }
 
+// Reliste les trades bought non listés (crash/deploy entre achat et listing)
+async function recoverUnlisted({ wallet, user }) {
+  const pending = await prisma.trade.findMany({
+    where: { userId: user.id, status: 'bought', listedAt: null, isPaperTrade: user.paperTrading }
+  })
+  if (!pending.length) return
+
+  for (const trade of pending) {
+    const floor = getFloor(trade.collection)
+    if (!floor) {
+      await prisma.botLog.create({
+        data: { userId: user.id, level: 'warn', module: 'positions', message: `Recovery: floor introuvable pour ${trade.collection} #${trade.tokenId} — listing différé` }
+      })
+      continue
+    }
+
+    await prisma.botLog.create({
+      data: { userId: user.id, level: 'info', module: 'positions', message: `Recovery: re-listing ${trade.collection} #${trade.tokenId} à ${floor} ETH` }
+    })
+
+    await listToken({
+      wallet,
+      tradeId: trade.id,
+      collection: trade.collection,
+      tokenId: trade.tokenId,
+      listPrice: floor,
+      isPaperTrade: user.paperTrading
+    })
+  }
+}
+
 function startPositionMonitor(ctx) {
+  // Reliste les positions orphelines avant le premier cycle
+  recoverUnlisted(ctx).catch(() => {})
   // Vérifie toutes les 30s
   setInterval(() => checkNewPositions(ctx), 30_000)
   checkNewPositions(ctx)
