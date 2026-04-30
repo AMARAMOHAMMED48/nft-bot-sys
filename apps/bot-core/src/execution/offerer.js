@@ -33,7 +33,7 @@ async function getCollectionFees(slug) {
 
   const fees = (res.data.fees || []).map(f => ({
     recipient: f.recipient,
-    basisPoints: f.fee  // ex: 250 = 2.5%
+    basisPoints: Math.round(f.fee * 100)  // 6.9% → 690 basis points
   }))
 
   feesCache.set(slug, fees)
