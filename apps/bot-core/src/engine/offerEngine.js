@@ -103,14 +103,19 @@ async function runOfferCycle(ctx) {
 
     const activeCount = await prisma.offer.count({ where: { userId, status: 'active' } })
 
-    await placeOffer({
-      wallet, userId,
-      collection: col.collectionAddress,
-      offerPrice: price,
-      floorPrice: floor,
-      isPaperTrade: paperTrading,
-      expiryMinutes: expiry
-    })
+    try {
+      await placeOffer({
+        wallet, userId,
+        collection: col.collectionAddress,
+        offerPrice: price,
+        floorPrice: floor,
+        isPaperTrade: paperTrading,
+        expiryMinutes: expiry
+      })
+    } catch (err) {
+      await log(userId, 'error', 'offer', `Échec placement offre ${col.collectionName}: ${err.response?.data?.errors?.[0] || err.message}`)
+      continue
+    }
 
     await log(userId, 'info', 'offer', `Offre placée ${price} ETH sur ${col.collectionName}`)
 
