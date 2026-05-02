@@ -20,7 +20,7 @@ async function fetchAllWalletNFTs(walletAddress) {
     return (res.data.ownedNfts || []).filter(n => n.contractAddress && n.tokenId)
   } catch (err) {
     console.log(`[positions][error] Alchemy: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
-    return []
+    return null  // null = erreur API, [] = wallet vraiment vide
   }
 }
 
@@ -33,6 +33,15 @@ async function checkNewPositions({ wallet, user }) {
 
   const addressSet = new Set(collections.map(c => c.collectionAddress.toLowerCase()))
   const allNfts = await fetchAllWalletNFTs(user.walletAddress)
+
+  if (allNfts === null) {
+    await prisma.botLog.create({
+      data: { userId: user.id, level: 'warn', module: 'positions',
+        message: 'Alchemy API indisponible — détection sold ignorée ce cycle' }
+    })
+    return
+  }
+
   const nfts = allNfts.filter(n => addressSet.has(n.contractAddress.toLowerCase()))
 
   const walletKey = user.walletAddress
@@ -52,7 +61,7 @@ async function checkNewPositions({ wallet, user }) {
     await handleNewNFT({ wallet, user, collection: nft.contractAddress.toLowerCase(), tokenId: nft.tokenId })
   }
 
-  // Nettoie les positions vendues
+  // Nettoie les positions vendues — seulement si l'API a répondu correctement
   const current = new Set(nfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
   for (const key of known) {
     if (current.has(key)) continue
@@ -140,6 +149,10 @@ async function recoverMissingTrades({ wallet, user }) {
 
   const addresses = new Set(collections.map(c => c.collectionAddress.toLowerCase()))
   const allNfts = await fetchAllWalletNFTs(user.walletAddress)
+  if (allNfts === null) {
+    console.log(`[recovery][warn] Alchemy indisponible — recoverMissingTrades ignoré`)
+    return
+  }
   const nfts = allNfts.filter(n => addresses.has(n.contractAddress.toLowerCase()))
 
   console.log(`[recovery] Wallet scan — ${allNfts.length} NFT(s) total, ${nfts.length} dans les collections surveillées`)
@@ -251,6 +264,10 @@ async function recoverSoldWhileOffline({ wallet, user }) {
   if (!activeTrades.length) return
 
   const allNfts = await fetchAllWalletNFTs(user.walletAddress)
+  if (allNfts === null) {
+    console.log(`[recovery][warn] Alchemy indisponible — recoverSoldWhileOffline ignoré`)
+    return
+  }
   const walletSet = new Set(allNfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
 
   for (const trade of activeTrades) {
