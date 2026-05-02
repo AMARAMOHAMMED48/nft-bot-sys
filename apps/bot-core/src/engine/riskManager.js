@@ -5,8 +5,6 @@ const { getEthBalance, getWethBalance, wrapEthToWeth } = require('../execution/w
 const { notify } = require('../notify')
 
 async function checkStopLoss(user) {
-  const globalStopLossPct = user.stopLossPct ?? 10
-
   const activeTrades = await prisma.trade.findMany({
     where: { userId: user.id, status: { in: ['bought', 'listed'] } }
   })
@@ -15,12 +13,12 @@ async function checkStopLoss(user) {
     const floor = getFloor(trade.collection)
     if (!floor) continue
 
-    // Config par collection → fallback global
     const colConfig = await prisma.userCollection.findFirst({
       where: { userId: user.id, collectionAddress: { equals: trade.collection, mode: 'insensitive' } },
       select: { stopLossPct: true }
     })
-    const stopLossPct = colConfig?.stopLossPct ?? globalStopLossPct
+    if (!colConfig) continue
+    const stopLossPct = colConfig.stopLossPct
 
     const stopPrice = parseFloat((trade.buyPrice * (1 - stopLossPct / 100)).toFixed(4))
     if (floor <= stopPrice) {
@@ -49,8 +47,7 @@ async function checkStopLoss(user) {
 }
 
 async function checkExpiredListings({ wallet, user }) {
-  const globalRelistMin = user.relistAfterMin ?? 15
-  const globalStopLossPct = user.stopLossPct ?? 10
+  const relistMin = user.relistAfterMin ?? 15
 
   const listed = await prisma.trade.findMany({
     where: { userId: user.id, status: { in: ['listed', 'stop_loss'] }, isPaperTrade: user.paperTrading }
@@ -62,10 +59,10 @@ async function checkExpiredListings({ wallet, user }) {
 
     const colConfig = await prisma.userCollection.findFirst({
       where: { userId: user.id, collectionAddress: { equals: trade.collection, mode: 'insensitive' } },
-      select: { relistAfterMin: true, stopLossPct: true }
+      select: { stopLossPct: true }
     })
-    const relistMin = colConfig?.relistAfterMin ?? globalRelistMin
-    const stopLossPct = colConfig?.stopLossPct ?? globalStopLossPct
+    if (!colConfig) continue
+    const stopLossPct = colConfig.stopLossPct
 
     const expired = (Date.now() - trade.listedAt.getTime()) >= relistMin * 60 * 1000
     if (!expired) continue

@@ -16,19 +16,16 @@ model User {
   walletAddress  String?
   walletKeyEnc   String?
   // Config bot par user
-  paperTrading       Boolean          @default(true)
-  offerBelowFloorPct Float?
-  offerMaxActive     Int              @default(5)
-  budgetMaxEth       Float            @default(1.0)
-  stopLossPct        Float            @default(10)
-  maxGasGwei      Int              @default(35)
-  offerExpiryMin  Int              @default(1440)
-  timeoutSellH    Int              @default(72)
-  relistAfterMin  Int              @default(15)
-  autoWrapAfterSale Boolean        @default(true)
-  ethReserveGas   Float            @default(0.01)
-  botEnabled     Boolean          @default(false)
-  discordWebhook String?
+  paperTrading      Boolean  @default(true)
+  budgetMaxEth      Float    @default(1.0)
+  maxGasGwei        Int      @default(35)
+  offerExpiryMin    Int      @default(1440)
+  timeoutSellH      Int      @default(72)
+  relistAfterMin    Int      @default(15)
+  autoWrapAfterSale Boolean  @default(true)
+  ethReserveGas     Float    @default(0.01)
+  botEnabled        Boolean  @default(false)
+  discordWebhook    String?
   createdAt      DateTime         @default(now())
   collections    UserCollection[]
   trades         Trade[]
@@ -41,13 +38,12 @@ model UserCollection {
   userId            String
   collectionAddress String
   collectionName    String
-  enabled           Boolean  @default(true)
-  // Config optionnelle par collection (override config globale si renseignée)
-  offerBelowFloorPct Float?
-  stopLossPct        Float?
-  offerExpiryMin     Int?
-  relistAfterMin     Int?
-  createdAt         DateTime @default(now())
+  enabled            Boolean  @default(true)
+  // Config obligatoire par collection
+  offerBelowFloorPct Float
+  stopLossPct        Float
+  offerMaxActive     Int      @default(5)
+  createdAt          DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, collectionAddress])

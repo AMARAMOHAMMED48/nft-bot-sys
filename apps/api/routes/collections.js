@@ -32,13 +32,12 @@ router.post('/', async (req, res) => {
 })
 
 router.patch('/:id', async (req, res) => {
-  const { enabled, offerBelowFloorPct, stopLossPct, offerExpiryMin, relistAfterMin } = req.body
+  const { enabled, offerBelowFloorPct, stopLossPct, offerMaxActive } = req.body
   const data = {}
   if (enabled !== undefined) data.enabled = enabled
-  if (offerBelowFloorPct !== undefined) data.offerBelowFloorPct = offerBelowFloorPct === '' ? null : parseFloat(offerBelowFloorPct)
-  if (stopLossPct !== undefined) data.stopLossPct = stopLossPct === '' ? null : parseFloat(stopLossPct)
-  if (offerExpiryMin !== undefined) data.offerExpiryMin = offerExpiryMin === '' ? null : parseInt(offerExpiryMin)
-  if (relistAfterMin !== undefined) data.relistAfterMin = relistAfterMin === '' ? null : parseInt(relistAfterMin)
+  if (offerBelowFloorPct !== undefined) data.offerBelowFloorPct = parseFloat(offerBelowFloorPct)
+  if (stopLossPct !== undefined) data.stopLossPct = parseFloat(stopLossPct)
+  if (offerMaxActive !== undefined) data.offerMaxActive = parseInt(offerMaxActive)
 
   try {
     const collection = await prisma.userCollection.updateMany({

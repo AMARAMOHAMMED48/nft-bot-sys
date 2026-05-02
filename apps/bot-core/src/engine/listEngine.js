@@ -27,13 +27,14 @@ async function listAfterAccepted({ wallet, user, offerId, tokenId, collection })
     }
   })
 
+  const relistMin = user.relistAfterMin ?? 15
+
   const colConfig = await prisma.userCollection.findFirst({
     where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
-    select: { relistAfterMin: true }
+    select: { stopLossPct: true }
   })
-  const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
-
-  const stopLossPrice = parseFloat((offer.offerPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+  const stopLossPct = colConfig?.stopLossPct ?? 1
+  const stopLossPrice = parseFloat((offer.offerPrice * (1 + stopLossPct / 100)).toFixed(4))
   const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
 
   await listToken({
@@ -62,13 +63,14 @@ async function listAfterSnipe({ wallet, user, tradeId, collection, tokenId, buyP
   const floor = getFloor(collection)
   if (!floor) return
 
+  const relistMin = user.relistAfterMin ?? 15
+
   const colConfig = await prisma.userCollection.findFirst({
     where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
-    select: { relistAfterMin: true }
+    select: { stopLossPct: true }
   })
-  const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
-
-  const stopLossPrice = parseFloat((buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+  const stopLossPct = colConfig?.stopLossPct ?? 1
+  const stopLossPrice = parseFloat((buyPrice * (1 + stopLossPct / 100)).toFixed(4))
   const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
 
   await listToken({ wallet, user, tradeId, collection, tokenId, listPrice, isPaperTrade: user.paperTrading, listExpiryMin: relistMin })

@@ -110,13 +110,14 @@ async function handleNewNFT({ wallet, user, collection, tokenId }) {
     return
   }
 
+  const relistMin = user.relistAfterMin ?? 15
+
   const colConfig = await prisma.userCollection.findFirst({
     where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
-    select: { relistAfterMin: true }
+    select: { stopLossPct: true }
   })
-  const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
-
-  const stopLossPrice = parseFloat((buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+  const stopLossPct = colConfig?.stopLossPct ?? 1
+  const stopLossPrice = parseFloat((buyPrice * (1 + stopLossPct / 100)).toFixed(4))
   const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
   await listToken({ wallet, user, tradeId: trade.id, collection, tokenId, listPrice, isPaperTrade: user.paperTrading, listExpiryMin: relistMin })
 
@@ -177,13 +178,14 @@ async function recoverMissingTrades({ wallet, user }) {
 
     const floor = getFloor(collection)
     if (floor) {
+      const relistMin = user.relistAfterMin ?? 15
+
       const colConfig = await prisma.userCollection.findFirst({
         where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
-        select: { relistAfterMin: true }
+        select: { stopLossPct: true }
       })
-      const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
-
-      const stopLossPrice = parseFloat((buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+      const stopLossPct = colConfig?.stopLossPct ?? 1
+      const stopLossPrice = parseFloat((buyPrice * (1 + stopLossPct / 100)).toFixed(4))
       const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
       console.log(`[recovery][info] Listing ${collection} #${tokenId} à ${listPrice} ETH`)
       try {
@@ -223,13 +225,14 @@ async function recoverUnlisted({ wallet, user }) {
       continue
     }
 
+    const relistMin = user.relistAfterMin ?? 15
+
     const colConfig = await prisma.userCollection.findFirst({
       where: { userId: user.id, collectionAddress: { equals: trade.collection, mode: 'insensitive' } },
-      select: { relistAfterMin: true }
+      select: { stopLossPct: true }
     })
-    const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
-
-    const stopLossPrice = parseFloat((trade.buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+    const stopLossPct = colConfig?.stopLossPct ?? 1
+    const stopLossPrice = parseFloat((trade.buyPrice * (1 + stopLossPct / 100)).toFixed(4))
     const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
     console.log(`[recovery][info] Re-listing ${trade.collection} #${trade.tokenId} à ${listPrice} ETH`)
     await prisma.botLog.create({

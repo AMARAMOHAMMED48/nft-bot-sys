@@ -7,9 +7,8 @@ const router = express.Router()
 router.use(authMiddleware)
 
 const CONFIG_FIELDS = [
-  'paperTrading', 'offerBelowFloorPct', 'offerMaxActive', 'offerExpiryMin', 'relistAfterMin',
-  'budgetMaxEth', 'stopLossPct', 'maxGasGwei', 'timeoutSellH', 'discordWebhook',
-  'autoWrapAfterSale', 'ethReserveGas'
+  'paperTrading', 'budgetMaxEth', 'maxGasGwei', 'offerExpiryMin', 'timeoutSellH',
+  'relistAfterMin', 'autoWrapAfterSale', 'ethReserveGas', 'discordWebhook'
 ]
 
 router.get('/', async (req, res) => {
