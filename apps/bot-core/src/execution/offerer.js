@@ -31,10 +31,14 @@ async function getCollectionFees(slug) {
     { headers: { 'x-api-key': process.env.OPENSEA_API_KEY }, timeout: 10000 }
   )
 
-  const fees = (res.data.fees || []).map(f => ({
-    recipient: f.recipient,
-    basisPoints: Math.round(f.fee * 100)  // 6.9% → 690 basis points
-  }))
+  // Pour les offres, OpenSea refuse les frais de créateur optionnels (required:false).
+  // On ne garde que les frais obligatoires (OpenSea fee + creator fees required).
+  const fees = (res.data.fees || [])
+    .filter(f => f.required)
+    .map(f => ({
+      recipient: f.recipient,
+      basisPoints: Math.round(f.fee * 100)  // 6.9% → 690 basis points
+    }))
 
   feesCache.set(slug, fees)
   return fees
