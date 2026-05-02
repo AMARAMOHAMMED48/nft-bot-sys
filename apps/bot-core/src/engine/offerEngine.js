@@ -72,26 +72,26 @@ async function runOfferCycle(ctx) {
   })
   const totalEngaged = budgetEngaged._sum.offerPrice ?? 0
 
-  // Vérification WETH globale + auto-wrap si ETH disponible
+  // Auto-wrap ETH → WETH : toujours convertir l'ETH disponible (au-dessus de la réserve)
   if (!paperTrading) {
-    let weth = await getWethBalance(wallet)
-    if (weth < 0.001) {
-      const reserve = user.ethReserveGas ?? 0.01
-      const ethBalance = await getEthBalance(wallet)
-      const toWrap = parseFloat(Math.min(user.budgetMaxEth ?? 1, Math.max(0, ethBalance - reserve)).toFixed(6))
-      if (toWrap > 0) {
-        try {
-          await wrapEthToWeth(wallet, toWrap)
-          weth = await getWethBalance(wallet)
-          await log(userId, 'info', 'offer', `Auto-wrap ${toWrap} ETH → WETH | Solde WETH: ${weth.toFixed(4)}`)
-        } catch (err) {
-          await log(userId, 'warn', 'offer', `Auto-wrap échoué: ${err.message} — cycle ignoré`)
-          return
-        }
-      } else {
-        await log(userId, 'warn', 'offer', `WETH quasi-vide (${weth} ETH) et ETH insuffisant (${ethBalance} ≤ réserve ${reserve}) — cycle ignoré`)
-        return
+    const reserve = user.ethReserveGas ?? 0.01
+    const ethBalance = await getEthBalance(wallet)
+    const toWrap = parseFloat((ethBalance - reserve).toFixed(6))
+    if (toWrap > 0) {
+      try {
+        const { txHash, amountWrapped } = await wrapEthToWeth(wallet, toWrap)
+        const wethAfter = await getWethBalance(wallet)
+        await log(userId, 'info', 'offer', `Auto-wrap ${amountWrapped} ETH → WETH | Solde WETH: ${wethAfter.toFixed(4)} | tx: ${txHash.slice(0, 10)}...`)
+      } catch (err) {
+        await log(userId, 'warn', 'offer', `Auto-wrap échoué: ${err.message}`)
       }
+    }
+
+    // Vérification WETH après wrap
+    const weth = await getWethBalance(wallet)
+    if (weth < 0.001) {
+      await log(userId, 'warn', 'offer', `WETH insuffisant (${weth} ETH) — cycle ignoré`)
+      return
     }
   }
 
@@ -140,26 +140,12 @@ async function runOfferCycle(ctx) {
       continue
     }
 
-    // WETH check par offre + auto-wrap si encore insuffisant
+    // WETH check par offre (guard final)
     if (!paperTrading) {
-      let weth = await getWethBalance(wallet)
+      const weth = await getWethBalance(wallet)
       if (weth < price) {
-        const reserve = user.ethReserveGas ?? 0.01
-        const ethBalance = await getEthBalance(wallet)
-        const toWrap = parseFloat(Math.min(price, Math.max(0, ethBalance - reserve)).toFixed(6))
-        if (toWrap >= price) {
-          try {
-            await wrapEthToWeth(wallet, toWrap)
-            weth = await getWethBalance(wallet)
-            await log(userId, 'info', 'offer', `Auto-wrap ${toWrap} ETH → WETH pour ${col.collectionName}`)
-          } catch (err) {
-            await log(userId, 'warn', 'offer', `Auto-wrap échoué pour ${col.collectionName}: ${err.message}`)
-            return
-          }
-        } else {
-          await log(userId, 'warn', 'offer', `WETH insuffisant pour ${col.collectionName} : ${weth} ETH, ETH disponible ${(ethBalance - reserve).toFixed(4)} < ${price}`)
-          return
-        }
+        await log(userId, 'warn', 'offer', `WETH insuffisant pour ${col.collectionName} : ${weth.toFixed(4)} < ${price} ETH`)
+        return
       }
     }
 
