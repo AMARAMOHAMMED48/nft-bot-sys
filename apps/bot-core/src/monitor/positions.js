@@ -240,7 +240,35 @@ async function recoverUnlisted({ wallet, user }) {
   }
 }
 
+// Détecte les trades listed/stop_loss dont le NFT n'est plus dans le wallet (vendu pendant arrêt du bot)
+async function recoverSoldWhileOffline({ wallet, user }) {
+  const activeTrades = await prisma.trade.findMany({
+    where: { userId: user.id, status: { in: ['listed', 'stop_loss', 'bought'] }, isPaperTrade: user.paperTrading }
+  })
+  if (!activeTrades.length) return
+
+  const allNfts = await fetchAllWalletNFTs(user.walletAddress)
+  const walletSet = new Set(allNfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
+
+  for (const trade of activeTrades) {
+    const key = `${trade.collection.toLowerCase()}:${trade.tokenId}`
+    if (walletSet.has(key)) continue
+
+    await prisma.trade.update({
+      where: { id: trade.id },
+      data: { status: 'sold', soldAt: new Date() }
+    })
+    console.log(`[recovery][info] Trade ${trade.collection} #${trade.tokenId} marqué sold — NFT absent du wallet`)
+    await prisma.botLog.create({
+      data: { userId: user.id, level: 'info', module: 'positions',
+        message: `Recovery: ${trade.collection} #${trade.tokenId} vendu pendant arrêt bot (prix non disponible)` }
+    })
+    await notify(user, `💰 VENDU (recovery) | ${trade.collection} #${trade.tokenId}\nVendu pendant l'arrêt du bot — vérifier le prix sur OpenSea`)
+  }
+}
+
 async function runRecovery(ctx) {
+  try { await recoverSoldWhileOffline(ctx) } catch (err) { console.log(`[recovery][error] recoverSoldWhileOffline: ${err.message}`) }
   try { await recoverMissingTrades(ctx) } catch (err) { console.log(`[recovery][error] recoverMissingTrades: ${err.message}`) }
   try { await recoverUnlisted(ctx) } catch (err) { console.log(`[recovery][error] recoverUnlisted: ${err.message}`) }
 }
