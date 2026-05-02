@@ -37,6 +37,28 @@ async function runOfferCycle(ctx) {
     data: { status: 'expired' }
   })
 
+  // Annuler les offres actives sur des collections désactivées
+  const disabledCols = await prisma.userCollection.findMany({
+    where: { userId, enabled: false },
+    select: { collectionAddress: true, collectionName: true }
+  })
+  if (disabledCols.length) {
+    const addrMap = new Map(disabledCols.map(c => [c.collectionAddress.toLowerCase(), c.collectionName]))
+    const activeOffers = await prisma.offer.findMany({
+      where: { userId, status: 'active', isPaperTrade: paperTrading }
+    })
+    for (const offer of activeOffers) {
+      const key = offer.collection.toLowerCase()
+      if (!addrMap.has(key)) continue
+      try {
+        await cancelOffer({ wallet, offerId: offer.id, isPaperTrade: paperTrading })
+        await log(userId, 'info', 'offer', `Offre annulée — collection désactivée : ${addrMap.get(key) || offer.collection}`)
+      } catch (err) {
+        await log(userId, 'error', 'offer', `Échec annulation offre désactivée: ${err.message}`)
+      }
+    }
+  }
+
   const gas = getGasGwei()
   if (gas > maxGasGwei) {
     await log(userId, 'warn', 'offer', `Gas trop élevé : ${gas} gwei`)
