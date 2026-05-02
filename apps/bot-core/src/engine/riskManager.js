@@ -79,6 +79,10 @@ async function checkExpiredListings({ wallet, user }) {
       continue
     }
 
+    // Guard : re-vérifier que le trade n'a pas été vendu entre temps (race condition)
+    const freshTrade = await prisma.trade.findUnique({ where: { id: trade.id }, select: { status: true } })
+    if (!freshTrade || freshTrade.status === 'sold') continue
+
     const stopLossPrice = parseFloat((trade.buyPrice * (1 + stopLossPct / 100)).toFixed(4))
     const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
 
