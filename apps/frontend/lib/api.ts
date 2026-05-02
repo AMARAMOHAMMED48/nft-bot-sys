@@ -58,11 +58,12 @@ export const api = {
     apiFetch(`/api/trades?limit=${limit}&status=${status}`),
   getPnl: () => apiFetch('/api/trades/pnl'),
   getFloors: () => apiFetch('/api/floors'),
-  getLogs: (params: { level?: string; since?: string; limit?: number } = {}) => {
+  getLogs: (params: { level?: string; since?: string; limit?: number; offset?: number } = {}) => {
     const q = new URLSearchParams()
     if (params.level) q.set('level', params.level)
     if (params.since) q.set('since', params.since)
     if (params.limit) q.set('limit', String(params.limit))
+    if (params.offset) q.set('offset', String(params.offset))
     return apiFetch(`/api/logs?${q}`)
   },
 }

@@ -12,9 +12,7 @@ type Status = {
 }
 
 type Config = {
-  offerBelowFloorPct: number | null
   budgetMaxEth: number
-  stopLossPct: number
   paperTrading: boolean
 }
 
@@ -94,6 +92,7 @@ export default function DashboardPage() {
           <a href="/dashboard" style={{ ...styles.navLink, color: '#c4b5fd' }}>Dashboard</a>
           <a href="/offers" style={styles.navLink}>Offres</a>
           <a href="/trades" style={styles.navLink}>Trades</a>
+          <a href="/logs" style={styles.navLink}>Logs</a>
           <a href="/config" style={styles.navLink}>Config</a>
         </div>
       </nav>
@@ -138,13 +137,6 @@ export default function DashboardPage() {
                     {f.floorPrice !== null ? `${f.floorPrice} ETH` : '—'}
                   </p>
 
-                  {config.offerBelowFloorPct != null && f.floorPrice && (
-                    <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
-                      Offre: {(f.floorPrice * (1 - config.offerBelowFloorPct / 100)).toFixed(4)} ETH
-                      (-{config.offerBelowFloorPct}% floor)
-                    </p>
-                  )}
-
                   {f.volume24h && (
                     <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>
                       Vol 24h: {f.volume24h.toFixed(2)} ETH
@@ -175,7 +167,7 @@ export default function DashboardPage() {
               </button>
             )}
             <span style={{ fontSize: 13, color: '#94a3b8' }}>
-              Budget: {config.budgetMaxEth} ETH max | Stop-loss: -{config.stopLossPct}%
+              Budget: {config.budgetMaxEth} ETH max
             </span>
           </div>
         </Section>

@@ -58,6 +58,7 @@ export default function TradesPage() {
           <a href="/dashboard" style={styles.navLink}>Dashboard</a>
           <a href="/offers" style={styles.navLink}>Offres</a>
           <a href="/trades" style={{ ...styles.navLink, color: '#c4b5fd' }}>Trades</a>
+          <a href="/logs" style={styles.navLink}>Logs</a>
           <a href="/config" style={styles.navLink}>Config</a>
         </div>
       </nav>

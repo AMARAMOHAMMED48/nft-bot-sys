@@ -21,8 +21,14 @@ export default function ToastProvider() {
   useEffect(() => {
     async function poll() {
       try {
-        const logs = await api.getLogs({ since: sinceRef.current, limit: 10 })
-        const alerts = logs.filter((l: any) => l.level === 'warn' || l.level === 'error')
+        const [warns, errors] = await Promise.all([
+          api.getLogs({ level: 'warn', since: sinceRef.current, limit: 5 }),
+          api.getLogs({ level: 'error', since: sinceRef.current, limit: 5 })
+        ])
+        const logs = [...errors, ...warns].sort(
+          (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        const alerts = logs
         if (!alerts.length) return
 
         sinceRef.current = logs[0].createdAt
