@@ -13,9 +13,17 @@ async function bootstrap() {
   })
   const addresses = allCollections.map(c => c.collectionAddress)
 
+  // Ajouter aussi les collections avec trades actifs (même désactivées) pour le floor poller
+  const activeTradeCols = await prisma.trade.findMany({
+    where: { status: { in: ['bought', 'listed', 'stop_loss'] } },
+    select: { collection: true },
+    distinct: ['collection']
+  })
+  const allAddresses = [...new Set([...addresses, ...activeTradeCols.map(t => t.collection)])]
+
   startGasPoller()
-  await startFloorPoller(addresses)
-  connect(addresses)
+  await startFloorPoller(allAddresses)
+  connect(addresses)  // events seulement sur les collections actives
 
   console.log(`[bot-core] Connecté — ${addresses.length} collection(s) surveillée(s)`)
 
@@ -35,7 +43,7 @@ async function bootstrap() {
       else if (!user.botEnabled && isRunning(user.id)) stopEngine(user.id)
     }
 
-    // Nouvelles collections ajoutées depuis le démarrage
+    // Nouvelles collections actives → floor + events
     const currentCollections = await prisma.userCollection.findMany({
       where: { enabled: true },
       select: { collectionAddress: true },
@@ -44,6 +52,16 @@ async function bootstrap() {
     for (const col of currentCollections) {
       addFloorCollection(col.collectionAddress)
       addEventCollection(col.collectionAddress)
+    }
+
+    // Collections désactivées mais avec trades actifs → floor uniquement (pour relist/stop-loss)
+    const tradeCollections = await prisma.trade.findMany({
+      where: { status: { in: ['bought', 'listed', 'stop_loss'] } },
+      select: { collection: true },
+      distinct: ['collection']
+    })
+    for (const t of tradeCollections) {
+      addFloorCollection(t.collection)
     }
   }, 30_000)
 }
