@@ -6,18 +6,26 @@ const { notify } = require('../notify')
 
 // walletAddress → Set of "collection:tokenId" déjà connus
 const knownPositions = new Map()
+// walletAddress → Map<key, missCount> — nombre de cycles consécutifs sans le NFT
+const missCounters = new Map()
 
-// Alchemy v3 avec withMetadata:false retourne { contractAddress, tokenId, balance }
+// Alchemy v3 avec pagination complète
 async function fetchAllWalletNFTs(walletAddress) {
+  const nfts = []
+  let pageKey
   try {
-    const res = await axios.get(
-      `https://eth-mainnet.g.alchemy.com/nft/v3/${process.env.ALCHEMY_API_KEY}/getNFTsForOwner`,
-      {
-        params: { owner: walletAddress, withMetadata: false, pageSize: 100 },
-        timeout: 10000
-      }
-    )
-    return (res.data.ownedNfts || []).filter(n => n.contractAddress && n.tokenId)
+    do {
+      const params = { owner: walletAddress, withMetadata: false, pageSize: 100 }
+      if (pageKey) params.pageKey = pageKey
+      const res = await axios.get(
+        `https://eth-mainnet.g.alchemy.com/nft/v3/${process.env.ALCHEMY_API_KEY}/getNFTsForOwner`,
+        { params, timeout: 10000 }
+      )
+      const page = (res.data.ownedNfts || []).filter(n => n.contractAddress && n.tokenId)
+      nfts.push(...page)
+      pageKey = res.data.pageKey
+    } while (pageKey)
+    return nfts
   } catch (err) {
     console.log(`[positions][error] Alchemy: ${err.response?.status} ${JSON.stringify(err.response?.data) || err.message}`)
     return null  // null = erreur API, [] = wallet vraiment vide
@@ -63,11 +71,24 @@ async function checkNewPositions({ wallet, user }) {
 
   // Nettoie les positions vendues — seulement si l'API a répondu correctement
   const current = new Set(nfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
-  for (const key of known) {
-    if (current.has(key)) continue
-    known.delete(key)
+  if (!missCounters.has(walletKey)) missCounters.set(walletKey, new Map())
+  const misses = missCounters.get(walletKey)
 
-    // NFT disparu du wallet — marquer le trade comme sold si onSale l'a raté
+  for (const key of known) {
+    if (current.has(key)) {
+      misses.delete(key) // réapparu → reset compteur
+      continue
+    }
+
+    // NFT absent ce cycle — incrémenter le compteur avant de conclure
+    const count = (misses.get(key) ?? 0) + 1
+    misses.set(key, count)
+    if (count < 2) continue // attendre 1 cycle de plus pour confirmer
+
+    // 2 cycles consécutifs sans le NFT → considéré vendu
+    known.delete(key)
+    misses.delete(key)
+
     const [collection, tokenId] = key.split(':')
     const trade = await prisma.trade.findFirst({
       where: { userId: user.id, tokenId, collection, status: { in: ['listed', 'stop_loss', 'bought'] } }
@@ -80,7 +101,7 @@ async function checkNewPositions({ wallet, user }) {
     })
     await prisma.botLog.create({
       data: { userId: user.id, level: 'info', module: 'positions',
-        message: `NFT ${collection} #${tokenId} disparu du wallet — trade marqué sold (prix non disponible)` }
+        message: `NFT ${collection} #${tokenId} disparu du wallet (2 cycles) — trade marqué sold` }
     })
     await notify(user, `💰 VENDU (détecté wallet) | ${collection} #${tokenId}\nPrix non disponible — vérifier sur OpenSea`)
   }
