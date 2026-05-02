@@ -186,8 +186,8 @@ async function cancelOffer({ wallet, offerId, isPaperTrade }) {
   if (!isPaperTrade && offer.offerTxHash) {
     try {
       await axios.post(
-        'https://api.opensea.io/api/v2/orders/cancel',
-        { order_hashes: [offer.offerTxHash], protocol_address: SEAPORT_ADDRESS },
+        `https://api.opensea.io/api/v2/orders/ethereum/${SEAPORT_ADDRESS}/cancel`,
+        { order_hashes: [offer.offerTxHash] },
         { headers: { 'x-api-key': process.env.OPENSEA_API_KEY, 'Content-Type': 'application/json' } }
       )
     } catch { }

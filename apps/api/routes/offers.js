@@ -5,11 +5,14 @@ const prisma = require('../lib/prisma')
 const SEAPORT_ADDRESS = '0x0000000000000068F116a894984e2DB1123eB395'
 
 async function cancelOnChain(orderHash) {
-  const res = await fetch('https://api.opensea.io/api/v2/orders/cancel', {
-    method: 'POST',
-    headers: { 'x-api-key': process.env.OPENSEA_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order_hashes: [orderHash], protocol_address: SEAPORT_ADDRESS })
-  })
+  const res = await fetch(
+    `https://api.opensea.io/api/v2/orders/ethereum/${SEAPORT_ADDRESS}/cancel`,
+    {
+      method: 'POST',
+      headers: { 'x-api-key': process.env.OPENSEA_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_hashes: [orderHash] })
+    }
+  )
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err?.errors?.[0] || `OpenSea cancel HTTP ${res.status}`)
