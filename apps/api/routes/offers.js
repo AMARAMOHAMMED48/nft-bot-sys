@@ -60,12 +60,15 @@ router.delete('/:id', async (req, res) => {
   if (!offer) return res.status(404).json({ error: 'Offre introuvable' })
   if (offer.status !== 'active') return res.status(400).json({ error: 'Offre non annulable' })
 
-  // Annulation on-chain immédiate pour les offres réelles
+  // Annulation on-chain immédiate pour les offres réelles (non bloquant)
   if (!offer.isPaperTrade && offer.offerTxHash) {
     try {
       await cancelOnChain(offer.offerTxHash)
     } catch (err) {
-      return res.status(502).json({ error: `Échec annulation OpenSea: ${err.message}` })
+      await prisma.botLog.create({
+        data: { userId: req.user.id, level: 'warn', module: 'offer',
+          message: `Cancel OpenSea échoué (ordre marqué cancelled quand même): ${err.message}` }
+      })
     }
   }
 
