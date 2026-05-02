@@ -55,7 +55,25 @@ async function checkNewPositions({ wallet, user }) {
   // Nettoie les positions vendues
   const current = new Set(nfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
   for (const key of known) {
-    if (!current.has(key)) known.delete(key)
+    if (current.has(key)) continue
+    known.delete(key)
+
+    // NFT disparu du wallet — marquer le trade comme sold si onSale l'a raté
+    const [collection, tokenId] = key.split(':')
+    const trade = await prisma.trade.findFirst({
+      where: { userId: user.id, tokenId, collection, status: { in: ['listed', 'stop_loss', 'bought'] } }
+    })
+    if (!trade) continue
+
+    await prisma.trade.update({
+      where: { id: trade.id },
+      data: { status: 'sold', soldAt: new Date() }
+    })
+    await prisma.botLog.create({
+      data: { userId: user.id, level: 'info', module: 'positions',
+        message: `NFT ${collection} #${tokenId} disparu du wallet — trade marqué sold (prix non disponible)` }
+    })
+    await notify(user, `💰 VENDU (détecté wallet) | ${collection} #${tokenId}\nPrix non disponible — vérifier sur OpenSea`)
   }
 }
 
