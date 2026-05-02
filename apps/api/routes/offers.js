@@ -7,9 +7,16 @@ const router = express.Router()
 router.use(authMiddleware)
 
 router.get('/', async (req, res) => {
+  const { status, isPaperTrade } = req.query
+  const where = { userId: req.user.id }
+  if (status && status !== 'all') where.status = status
+  else if (!status) where.status = 'active'
+  if (isPaperTrade !== undefined) where.isPaperTrade = isPaperTrade === 'true'
+
   const offers = await prisma.offer.findMany({
-    where: { userId: req.user.id, status: 'active' },
-    orderBy: { createdAt: 'desc' }
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: 200
   })
 
   // Enrichit avec le nom de la collection

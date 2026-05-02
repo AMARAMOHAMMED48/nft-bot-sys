@@ -50,12 +50,22 @@ export const api = {
   resumeBot: () => apiFetch('/api/bot/resume', { method: 'POST' }),
 
   // Offers
-  getOffers: () => apiFetch('/api/offers'),
+  getOffers: (params: { status?: string; isPaperTrade?: boolean } = {}) => {
+    const q = new URLSearchParams()
+    if (params.status) q.set('status', params.status)
+    if (params.isPaperTrade !== undefined) q.set('isPaperTrade', String(params.isPaperTrade))
+    return apiFetch(`/api/offers?${q}`)
+  },
   cancelOffer: (id: string) => apiFetch(`/api/offers/${id}`, { method: 'DELETE' }),
 
   // Trades
-  getTrades: (limit = 50, status = 'all') =>
-    apiFetch(`/api/trades?limit=${limit}&status=${status}`),
+  getTrades: (params: { status?: string; isPaperTrade?: boolean; collection?: string } = {}) => {
+    const q = new URLSearchParams({ limit: '200' })
+    if (params.status) q.set('status', params.status)
+    if (params.isPaperTrade !== undefined) q.set('isPaperTrade', String(params.isPaperTrade))
+    if (params.collection) q.set('collection', params.collection)
+    return apiFetch(`/api/trades?${q}`)
+  },
   getPnl: () => apiFetch('/api/trades/pnl'),
   getFloors: () => apiFetch('/api/floors'),
   getLogs: (params: { level?: string; since?: string; limit?: number; offset?: number } = {}) => {

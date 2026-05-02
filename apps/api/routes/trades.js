@@ -7,11 +7,13 @@ const router = express.Router()
 router.use(authMiddleware)
 
 router.get('/', async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit) || 50, 200)
-  const status = req.query.status
+  const limit = Math.min(parseInt(req.query.limit) || 200, 200)
+  const { status, isPaperTrade, collection } = req.query
 
   const where = { userId: req.user.id }
   if (status && status !== 'all') where.status = status
+  if (isPaperTrade !== undefined) where.isPaperTrade = isPaperTrade === 'true'
+  if (collection) where.collection = { equals: collection, mode: 'insensitive' }
 
   const trades = await prisma.trade.findMany({
     where,
