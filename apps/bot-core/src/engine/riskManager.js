@@ -114,7 +114,12 @@ async function onSale({ user, saleData }) {
   if (!tokenId || !sellPrice) return
 
   const trade = await prisma.trade.findFirst({
-    where: { userId: user.id, tokenId, collection, status: { in: ['listed', 'stop_loss'] } }
+    where: {
+      userId: user.id,
+      tokenId,
+      collection: { equals: collection, mode: 'insensitive' },
+      status: { in: ['listed', 'stop_loss'] }
+    }
   })
   if (!trade) return
 
@@ -125,9 +130,15 @@ async function onSale({ user, saleData }) {
     data: { sellPrice, status: 'sold', soldAt: new Date(), pnl }
   })
 
+  const col = await prisma.userCollection.findFirst({
+    where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
+    select: { collectionName: true }
+  })
+  const collectionLabel = col?.collectionName || collection
+
   const emoji = pnl >= 0 ? '✅' : '❌'
   await notify(user, [
-    `💰 VENDU | ${collection} #${tokenId}`,
+    `💰 VENDU | ${collectionLabel} #${tokenId}`,
     `${trade.buyPrice} → ${sellPrice} ETH | P&L net: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} ETH ${emoji}`
   ].join('\n'))
 }
