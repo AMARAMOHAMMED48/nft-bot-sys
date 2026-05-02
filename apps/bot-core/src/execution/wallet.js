@@ -23,4 +23,16 @@ async function getWethBalance(wallet) {
   return parseFloat(ethers.formatEther(bal))
 }
 
-module.exports = { loadWallet, getWethBalance }
+async function getEthBalance(wallet) {
+  const bal = await wallet.provider.getBalance(wallet.address)
+  return parseFloat(ethers.formatEther(bal))
+}
+
+async function wrapEthToWeth(wallet, amountEth) {
+  const weth = new ethers.Contract(WETH_ADDRESS, WETH_ABI, wallet)
+  const tx = await weth.deposit({ value: ethers.parseEther(amountEth.toString()) })
+  const receipt = await tx.wait()
+  return { txHash: tx.hash, blockNumber: receipt.blockNumber }
+}
+
+module.exports = { loadWallet, getWethBalance, getEthBalance, wrapEthToWeth }

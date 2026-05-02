@@ -1,6 +1,7 @@
 const prisma = require('../lib/prisma')
 const { getFloor } = require('../data/floorPrice')
 const { listToken } = require('../execution/lister')
+const { getEthBalance, getWethBalance, wrapEthToWeth } = require('../execution/wallet')
 const { notify } = require('../notify')
 
 async function checkStopLoss(user) {
@@ -106,7 +107,7 @@ async function checkExpiredListings({ wallet, user }) {
   }
 }
 
-async function onSale({ user, saleData }) {
+async function onSale({ wallet, user, saleData }) {
   const tokenId = saleData.token?.tokenId
   const collection = saleData.collection?.id
   const sellPrice = saleData.price?.amount?.native
@@ -141,6 +142,36 @@ async function onSale({ user, saleData }) {
     `💰 VENDU | ${collectionLabel} #${tokenId}`,
     `${trade.buyPrice} → ${sellPrice} ETH | P&L net: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} ETH ${emoji}`
   ].join('\n'))
+
+  if (user.autoWrapAfterSale && wallet && !user.paperTrading) {
+    try {
+      const reserve = user.ethReserveGas ?? 0.01
+      const ethBalance = await getEthBalance(wallet)
+      const toWrap = parseFloat(Math.min(sellPrice, ethBalance - reserve).toFixed(6))
+      if (toWrap <= 0) {
+        await prisma.botLog.create({
+          data: { userId: user.id, level: 'warn', module: 'wrap',
+            message: `Auto-wrap skip — ETH ${ethBalance.toFixed(4)} ≤ réserve ${reserve}` }
+        })
+        return
+      }
+      const { txHash } = await wrapEthToWeth(wallet, toWrap)
+      const wethAfter = await getWethBalance(wallet)
+      await prisma.botLog.create({
+        data: { userId: user.id, level: 'info', module: 'wrap',
+          message: `Auto-wrap ${toWrap} ETH → WETH | tx: ${txHash}` }
+      })
+      await notify(user, [
+        `🔁 ETH → WETH | ${toWrap} ETH wrapped`,
+        `Solde WETH: ${wethAfter.toFixed(4)} ETH | tx: ${txHash.slice(0, 10)}...`
+      ].join('\n'))
+    } catch (err) {
+      await prisma.botLog.create({
+        data: { userId: user.id, level: 'error', module: 'wrap',
+          message: `Auto-wrap échec: ${err.message}` }
+      })
+    }
+  }
 }
 
 module.exports = { checkStopLoss, checkExpiredListings, onSale }

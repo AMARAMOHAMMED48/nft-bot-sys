@@ -27,6 +27,8 @@ type Config = {
   timeoutSellH: number
   maxPositions: number
   discordWebhook: string | null
+  autoWrapAfterSale: boolean
+  ethReserveGas: number
 }
 
 export default function ConfigPage() {
@@ -162,6 +164,15 @@ export default function ConfigPage() {
               value={config.maxGasGwei} onChange={v => updateConfig('maxGasGwei', parseInt(v))} />
             <Field label="Timeout listing (heures)" type="number" step="1"
               value={config.timeoutSellH} onChange={v => updateConfig('timeoutSellH', parseInt(v))} />
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#e2e8f0', fontSize: 14 }}>
+              <input type="checkbox" checked={(config as any).autoWrapAfterSale ?? true}
+                onChange={e => updateConfig('autoWrapAfterSale', e.target.checked)} />
+              Auto-swap ETH → WETH après vente
+            </label>
+            <Field label="Réserve ETH pour gas (ex: 0.01)" type="number" step="0.001"
+              value={(config as any).ethReserveGas ?? 0.01} onChange={v => updateConfig('ethReserveGas', parseFloat(v))} />
+
             <Field label="Webhook Discord" type="url"
               value={config.discordWebhook ?? ''} onChange={v => updateConfig('discordWebhook', v || null)} />
 

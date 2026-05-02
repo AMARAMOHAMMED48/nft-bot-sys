@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "autoWrapAfterSale" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "User" ADD COLUMN     "ethReserveGas" DOUBLE PRECISION NOT NULL DEFAULT 0.01;

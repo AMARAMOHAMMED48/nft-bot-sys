@@ -33,7 +33,7 @@ function startEngine(user) {
   activeEngines.set(user.id, { interval, wallet })
 
   // Ventes détectées via polling OpenSea
-  on('sale', data => onSale({ user, saleData: data }))
+  on('sale', data => onSale({ wallet, user, saleData: data }))
 
   // Moniteur wallet — détecte les offres acceptées
   startPositionMonitor({ wallet, user })

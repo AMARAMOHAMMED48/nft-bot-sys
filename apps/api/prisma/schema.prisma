@@ -25,6 +25,8 @@ model User {
   offerExpiryMin  Int              @default(1440)
   timeoutSellH    Int              @default(72)
   relistAfterMin  Int              @default(15)
+  autoWrapAfterSale Boolean        @default(true)
+  ethReserveGas   Float            @default(0.01)
   botEnabled     Boolean          @default(false)
   discordWebhook String?
   createdAt      DateTime         @default(now())

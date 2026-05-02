@@ -8,7 +8,8 @@ router.use(authMiddleware)
 
 const CONFIG_FIELDS = [
   'paperTrading', 'offerBelowFloorPct', 'offerMaxActive', 'offerExpiryMin', 'relistAfterMin',
-  'budgetMaxEth', 'stopLossPct', 'maxGasGwei', 'timeoutSellH', 'discordWebhook'
+  'budgetMaxEth', 'stopLossPct', 'maxGasGwei', 'timeoutSellH', 'discordWebhook',
+  'autoWrapAfterSale', 'ethReserveGas'
 ]
 
 router.get('/', async (req, res) => {
