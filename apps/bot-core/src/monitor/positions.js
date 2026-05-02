@@ -96,7 +96,7 @@ async function handleNewNFT({ wallet, user, collection, tokenId }) {
     where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
     select: { relistAfterMin: true }
   })
-  const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 1440
+  const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
 
   const stopLossPrice = parseFloat((buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
   const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
@@ -163,7 +163,7 @@ async function recoverMissingTrades({ wallet, user }) {
         where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
         select: { relistAfterMin: true }
       })
-      const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 1440
+      const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
 
       const stopLossPrice = parseFloat((buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
       const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
@@ -209,7 +209,7 @@ async function recoverUnlisted({ wallet, user }) {
       where: { userId: user.id, collectionAddress: { equals: trade.collection, mode: 'insensitive' } },
       select: { relistAfterMin: true }
     })
-    const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 1440
+    const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 15
 
     const stopLossPrice = parseFloat((trade.buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
     const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))

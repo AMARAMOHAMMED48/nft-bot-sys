@@ -48,7 +48,7 @@ async function checkStopLoss(user) {
 }
 
 async function checkExpiredListings({ wallet, user }) {
-  const globalRelistMin = user.relistAfterMin ?? 1440
+  const globalRelistMin = user.relistAfterMin ?? 15
   const globalStopLossPct = user.stopLossPct ?? 10
 
   const listed = await prisma.trade.findMany({

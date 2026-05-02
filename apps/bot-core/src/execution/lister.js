@@ -62,15 +62,24 @@ async function getAllFees(collectionAddress) {
   }
 }
 
-async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 1440 }) {
+async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 15 }) {
   const label = isPaperTrade ? ' [PAPER]' : ''
+
+  let collectionLabel = collection
+  if (user) {
+    const col = await prisma.userCollection.findFirst({
+      where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
+      select: { collectionName: true }
+    })
+    if (col?.collectionName) collectionLabel = col.collectionName
+  }
 
   if (isPaperTrade) {
     await prisma.trade.update({
       where: { id: tradeId },
       data: { listPrice, status: 'listed', listedAt: new Date() }
     })
-    if (user) await notify(user, `📋 LISTING${label} | ${collection} #${tokenId}\nPrix: ${listPrice} ETH`)
+    if (user) await notify(user, `📋 LISTING${label} | ${collectionLabel} #${tokenId}\nPrix: ${listPrice} ETH`)
     return { txHash: null }
   }
 
@@ -94,7 +103,7 @@ async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice
     })
 
     const sellerAmount = listPriceWei - totalFeesWei
-    const minutes   = Math.max(listExpiryMin ?? 1440, 15) // minimum 15 min
+    const minutes   = Math.max(listExpiryMin ?? 15, 15) // minimum 15 min
     const startTime = Math.floor(Date.now() / 1000).toString()
     const endTime   = (Math.floor(Date.now() / 1000) + minutes * 60).toString()
     const salt         = Math.floor(Math.random() * 1e15).toString()
@@ -168,7 +177,7 @@ async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice
     })
 
     console.log(`[lister] ✅ Listé ${collection} #${tokenId} à ${listPrice} ETH | order: ${orderId}`)
-    if (user) await notify(user, `📋 LISTING${label} | ${collection} #${tokenId}\nPrix: ${listPrice} ETH | Order: ${orderId?.slice(0, 10)}...`)
+    if (user) await notify(user, `📋 LISTING${label} | ${collectionLabel} #${tokenId}\nPrix: ${listPrice} ETH | Order: ${orderId?.slice(0, 10)}...`)
     return { txHash: orderId }
 
   } catch (err) {

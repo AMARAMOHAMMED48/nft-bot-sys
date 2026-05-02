@@ -147,7 +147,7 @@ export default function ConfigPage() {
             <Field label="Durée offre (minutes, min: 10, ex: 15 / 60 / 1440)" type="number" step="1"
               value={(config as any).offerExpiryMin ?? 1440} onChange={v => updateConfig('offerExpiryMin', parseInt(v))} />
             <Field label="Durée listing & auto-relist (minutes, min: 15, ex: 15 / 60 / 1440)" type="number" step="1"
-              value={(config as any).relistAfterMin ?? 1440} onChange={v => updateConfig('relistAfterMin', parseInt(v))} />
+              value={(config as any).relistAfterMin ?? 15} onChange={v => updateConfig('relistAfterMin', parseInt(v))} />
             <Field label="Budget max (ETH)" type="number" step="0.01"
               value={config.budgetMaxEth} onChange={v => updateConfig('budgetMaxEth', parseFloat(v))} />
             <Field label="Stop-loss (% sous prix d'achat) — ex: 10 → vend si floor < achat × 90%" type="number" step="0.1"
