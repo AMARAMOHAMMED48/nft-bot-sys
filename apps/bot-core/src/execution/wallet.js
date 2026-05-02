@@ -30,23 +30,25 @@ async function getEthBalance(wallet) {
 
 async function wrapEthToWeth(wallet, amountEth) {
   const weth = new ethers.Contract(WETH_ADDRESS, WETH_ABI, wallet)
-  const valueWei = ethers.parseEther(amountEth.toFixed(18))
 
-  // Estimation dynamique du gas pour ne jamais manquer de fonds
-  const [feeData, gasLimit] = await Promise.all([
-    wallet.provider.getFeeData(),
-    weth.deposit.estimateGas({ value: valueWei })
+  const [balanceWei, feeData] = await Promise.all([
+    wallet.provider.getBalance(wallet.address),
+    wallet.provider.getFeeData()
   ])
-  const gasCostWei = (feeData.maxFeePerGas ?? feeData.gasPrice) * gasLimit
+  const gasPrice = feeData.maxFeePerGas ?? feeData.gasPrice
 
-  // Réduit le montant si le gas empiète sur la valeur à wrapper
-  const balanceWei = await wallet.provider.getBalance(wallet.address)
+  // Estimer le gas avec 1 wei pour éviter INSUFFICIENT_FUNDS sur l'estimation elle-même
+  const gasLimit = await weth.deposit.estimateGas({ value: 1n })
+  const gasCostWei = gasPrice * gasLimit
+
   const maxWrapWei = balanceWei - gasCostWei
   if (maxWrapWei <= 0n) throw new Error(`ETH insuffisant pour couvrir le gas du wrap (${ethers.formatEther(gasCostWei)} ETH)`)
 
-  const finalWei = valueWei > maxWrapWei ? maxWrapWei : valueWei
+  const requestedWei = ethers.parseEther(amountEth.toFixed(18))
+  const finalWei = requestedWei > maxWrapWei ? maxWrapWei : requestedWei
+
   const tx = await weth.deposit({ value: finalWei, gasLimit })
-  const receipt = await tx.wait()
+  await tx.wait()
   return { txHash: tx.hash, amountWrapped: parseFloat(ethers.formatEther(finalWei)) }
 }
 

@@ -71,14 +71,15 @@ async function runOfferCycle(ctx) {
   if (!paperTrading) {
     const reserve = user.ethReserveGas ?? 0.01
     const ethBalance = await getEthBalance(wallet)
-    const toWrap = parseFloat((ethBalance - reserve).toFixed(6))
-    if (toWrap > 0) {
+    const toWrap = Math.floor((ethBalance - reserve) * 1e6) / 1e6
+    if (toWrap >= 0.0001) {
       try {
         const { txHash, amountWrapped } = await wrapEthToWeth(wallet, toWrap)
         const wethAfter = await getWethBalance(wallet)
         await log(userId, 'info', 'offer', `Auto-wrap ${amountWrapped} ETH → WETH | Solde WETH: ${wethAfter.toFixed(4)} | tx: ${txHash.slice(0, 10)}...`)
       } catch (err) {
-        await log(userId, 'warn', 'offer', `Auto-wrap échoué: ${err.message}`)
+        const isNoFunds = err.code === 'INSUFFICIENT_FUNDS' || err.message?.includes('insufficient funds')
+        await log(userId, isNoFunds ? 'info' : 'warn', 'offer', `Auto-wrap échoué: ${err.shortMessage || err.message}`)
       }
     }
 
