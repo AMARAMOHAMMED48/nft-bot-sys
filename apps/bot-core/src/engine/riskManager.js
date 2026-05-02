@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma')
 const { getFloor } = require('../data/floorPrice')
+const { listToken } = require('../execution/lister')
 const { notify } = require('../notify')
 
 async function checkStopLoss(user) {
@@ -43,18 +44,66 @@ async function checkStopLoss(user) {
     }
   }
 
-  // Timeout sell — positions listées depuis trop longtemps
-  const timeout = new Date(Date.now() - user.timeoutSellH * 3600 * 1000)
-  await prisma.trade.updateMany({
-    where: {
-      userId: user.id,
-      status: 'listed',
-      listedAt: { lt: timeout }
-    },
-    data: { status: 'timeout_sold' }
-  })
-
   return false
+}
+
+async function checkExpiredListings({ wallet, user }) {
+  const globalRelistMin = user.relistAfterMin ?? 1440
+  const globalStopLossPct = user.stopLossPct ?? 10
+
+  const listed = await prisma.trade.findMany({
+    where: { userId: user.id, status: { in: ['listed', 'stop_loss'] }, isPaperTrade: user.paperTrading }
+  })
+  if (!listed.length) return
+
+  for (const trade of listed) {
+    if (!trade.listedAt) continue
+
+    const colConfig = await prisma.userCollection.findFirst({
+      where: { userId: user.id, collectionAddress: { equals: trade.collection, mode: 'insensitive' } },
+      select: { relistAfterMin: true, stopLossPct: true }
+    })
+    const relistMin = colConfig?.relistAfterMin ?? globalRelistMin
+    const stopLossPct = colConfig?.stopLossPct ?? globalStopLossPct
+
+    const expired = (Date.now() - trade.listedAt.getTime()) >= relistMin * 60 * 1000
+    if (!expired) continue
+
+    const floor = getFloor(trade.collection)
+    if (!floor) {
+      await prisma.botLog.create({
+        data: { userId: user.id, level: 'warn', module: 'risk',
+          message: `Relist différé — floor introuvable pour ${trade.collection} #${trade.tokenId}` }
+      })
+      continue
+    }
+
+    const stopLossPrice = parseFloat((trade.buyPrice * (1 + stopLossPct / 100)).toFixed(4))
+    const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
+
+    try {
+      await listToken({
+        wallet, user, tradeId: trade.id,
+        collection: trade.collection, tokenId: trade.tokenId,
+        listPrice, isPaperTrade: user.paperTrading,
+        listExpiryMin: relistMin
+      })
+      const aboveFloor = listPrice > floor ? ` (plancher stop-loss au-dessus floor ${floor})` : ''
+      await prisma.botLog.create({
+        data: { userId: user.id, level: 'info', module: 'risk',
+          message: `Auto-relist ${trade.collection} #${trade.tokenId} @ ${listPrice} ETH${aboveFloor}` }
+      })
+      await notify(user, [
+        `🔄 AUTO-RELIST | ${trade.collection} #${trade.tokenId}`,
+        `Prix: ${listPrice} ETH${aboveFloor} | Précédent listing > ${relistMin}min sans vente`
+      ].join('\n'))
+    } catch (err) {
+      await prisma.botLog.create({
+        data: { userId: user.id, level: 'error', module: 'risk',
+          message: `Auto-relist échec ${trade.collection} #${trade.tokenId}: ${err.message}` }
+      })
+    }
+  }
 }
 
 async function onSale({ user, saleData }) {
@@ -83,4 +132,4 @@ async function onSale({ user, saleData }) {
   ].join('\n'))
 }
 
-module.exports = { checkStopLoss, onSale }
+module.exports = { checkStopLoss, checkExpiredListings, onSale }

@@ -11,6 +11,7 @@ type Collection = {
   offerBelowFloorPct: number | null
   stopLossPct: number | null
   offerExpiryMin: number | null
+  relistAfterMin: number | null
 }
 
 type Config = {
@@ -22,7 +23,7 @@ type Config = {
   buyTriggerPct: number
   maxGasGwei: number
   offerExpiryMin: number
-  listExpiryMin: number
+  relistAfterMin: number
   timeoutSellH: number
   maxPositions: number
   discordWebhook: string | null
@@ -145,8 +146,8 @@ export default function ConfigPage() {
               value={(config as any).offerBelowFloorPct ?? ''} onChange={v => updateConfig('offerBelowFloorPct', v ? parseFloat(v) : null)} />
             <Field label="Durée offre (minutes, min: 10, ex: 15 / 60 / 1440)" type="number" step="1"
               value={(config as any).offerExpiryMin ?? 1440} onChange={v => updateConfig('offerExpiryMin', parseInt(v))} />
-            <Field label="Durée listing (minutes, min: 15, ex: 15 / 60 / 10080)" type="number" step="1"
-              value={(config as any).listExpiryMin ?? 10080} onChange={v => updateConfig('listExpiryMin', parseInt(v))} />
+            <Field label="Durée listing & auto-relist (minutes, min: 15, ex: 15 / 60 / 1440)" type="number" step="1"
+              value={(config as any).relistAfterMin ?? 1440} onChange={v => updateConfig('relistAfterMin', parseInt(v))} />
             <Field label="Budget max (ETH)" type="number" step="0.01"
               value={config.budgetMaxEth} onChange={v => updateConfig('budgetMaxEth', parseFloat(v))} />
             <Field label="Stop-loss (% sous prix d'achat) — ex: 10 → vend si floor < achat × 90%" type="number" step="0.1"
@@ -180,12 +181,13 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
   col: Collection
   onToggle: () => void
   onDelete: () => void
-  onSave: (data: { offerBelowFloorPct?: number | null, stopLossPct?: number | null, offerExpiryMin?: number | null }) => void
+  onSave: (data: { offerBelowFloorPct?: number | null, stopLossPct?: number | null, offerExpiryMin?: number | null, relistAfterMin?: number | null }) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [belowPct, setBelowPct] = useState(col.offerBelowFloorPct?.toString() ?? '')
   const [slPct, setSlPct] = useState(col.stopLossPct?.toString() ?? '')
   const [expiry, setExpiry] = useState(col.offerExpiryMin?.toString() ?? '')
+  const [relist, setRelist] = useState(col.relistAfterMin?.toString() ?? '')
 
   return (
     <div style={{ borderBottom: '1px solid #2d2d4e' }}>
@@ -195,13 +197,15 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
             {expanded ? '▾' : '▸'} {col.collectionName}
           </p>
           <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{col.collectionAddress}</p>
-          {(col.offerBelowFloorPct || col.stopLossPct || col.offerExpiryMin) && (
+          {(col.offerBelowFloorPct || col.stopLossPct || col.offerExpiryMin || col.relistAfterMin) && (
             <p style={{ margin: '2px 0 0', fontSize: 11, color: '#7c3aed' }}>
               {col.offerBelowFloorPct != null ? `Offre: -${col.offerBelowFloorPct}%` : 'Offre: global'}
               {' · '}
               {col.stopLossPct != null ? `SL: -${col.stopLossPct}%` : 'SL: global'}
               {' · '}
-              {col.offerExpiryMin ? `Durée: ${col.offerExpiryMin}min` : 'Durée: global'}
+              {col.offerExpiryMin ? `Offre dur: ${col.offerExpiryMin}min` : 'Offre dur: global'}
+              {' · '}
+              {col.relistAfterMin ? `Relist: ${col.relistAfterMin}min` : 'Relist: global'}
             </p>
           )}
         </div>
@@ -240,21 +244,30 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
               <input style={styles.input} type="number" step="1" placeholder="Global"
                 value={expiry} onChange={e => setExpiry(e.target.value)} />
             </div>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
+                Listing & relist (min)
+              </label>
+              <input style={styles.input} type="number" step="1" placeholder="Global"
+                value={relist} onChange={e => setRelist(e.target.value)} />
+            </div>
             <button style={styles.smallBtn} onClick={() => {
               onSave({
                 offerBelowFloorPct: belowPct ? parseFloat(belowPct) : null,
                 stopLossPct: slPct ? parseFloat(slPct) : null,
-                offerExpiryMin: expiry ? parseInt(expiry) : null
+                offerExpiryMin: expiry ? parseInt(expiry) : null,
+                relistAfterMin: relist ? parseInt(relist) : null
               })
               setExpanded(false)
             }}>
               Sauver
             </button>
             <button style={{ ...styles.smallBtn, background: '#4b5563' }} onClick={() => {
-              onSave({ offerBelowFloorPct: null, stopLossPct: null, offerExpiryMin: null })
+              onSave({ offerBelowFloorPct: null, stopLossPct: null, offerExpiryMin: null, relistAfterMin: null })
               setBelowPct('')
               setSlPct('')
               setExpiry('')
+              setRelist('')
               setExpanded(false)
             }}>
               Reset

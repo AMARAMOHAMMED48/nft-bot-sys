@@ -23,8 +23,8 @@ model User {
   stopLossPct        Float            @default(10)
   maxGasGwei      Int              @default(35)
   offerExpiryMin  Int              @default(1440)
-  listExpiryMin   Int              @default(10080)
   timeoutSellH    Int              @default(72)
+  relistAfterMin  Int              @default(1440)
   botEnabled     Boolean          @default(false)
   discordWebhook String?
   createdAt      DateTime         @default(now())
@@ -44,6 +44,7 @@ model UserCollection {
   offerBelowFloorPct Float?
   stopLossPct        Float?
   offerExpiryMin     Int?
+  relistAfterMin     Int?
   createdAt         DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -1,7 +1,7 @@
 const prisma = require('../lib/prisma')
 const { loadWallet } = require('../execution/wallet')
 const { runOfferCycle } = require('./offerEngine')
-const { checkStopLoss, onSale } = require('./riskManager')
+const { checkStopLoss, checkExpiredListings, onSale } = require('./riskManager')
 const { on } = require('../data/events')
 const { startPositionMonitor } = require('../monitor/positions')
 
@@ -24,6 +24,8 @@ function startEngine(user) {
       stopEngine(freshUser.id)
       return
     }
+
+    await checkExpiredListings({ wallet, user: freshUser })
 
     await runOfferCycle({ wallet, user: freshUser })
   }, 60_000)

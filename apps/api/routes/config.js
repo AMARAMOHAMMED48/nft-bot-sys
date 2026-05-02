@@ -7,7 +7,7 @@ const router = express.Router()
 router.use(authMiddleware)
 
 const CONFIG_FIELDS = [
-  'paperTrading', 'offerBelowFloorPct', 'offerMaxActive', 'offerExpiryMin', 'listExpiryMin',
+  'paperTrading', 'offerBelowFloorPct', 'offerMaxActive', 'offerExpiryMin', 'relistAfterMin',
   'budgetMaxEth', 'stopLossPct', 'maxGasGwei', 'timeoutSellH', 'discordWebhook'
 ]
 

@@ -92,13 +92,21 @@ async function handleNewNFT({ wallet, user, collection, tokenId }) {
     return
   }
 
-  await listToken({ wallet, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+  const colConfig = await prisma.userCollection.findFirst({
+    where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
+    select: { relistAfterMin: true }
+  })
+  const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 1440
 
-  const profit = floor - buyPrice
+  const stopLossPrice = parseFloat((buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+  const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
+  await listToken({ wallet, user, tradeId: trade.id, collection, tokenId, listPrice, isPaperTrade: user.paperTrading, listExpiryMin: relistMin })
+
+  const profit = listPrice - buyPrice
   const label = user.paperTrading ? '[PAPER]' : ''
   await notify(user, [
     `🎯 OFFRE ACCEPTÉE ${label} | ${collection} #${tokenId}`,
-    `Acheté: ${buyPrice} ETH → Listé: ${floor} ETH (floor)`,
+    `Acheté: ${buyPrice} ETH → Listé: ${listPrice} ETH`,
     `Profit potentiel: +${profit.toFixed(4)} ETH (+${buyPrice > 0 ? ((profit / buyPrice) * 100).toFixed(1) : '∞'}%)`
   ].join('\n'))
 }
@@ -151,9 +159,17 @@ async function recoverMissingTrades({ wallet, user }) {
 
     const floor = getFloor(collection)
     if (floor) {
-      console.log(`[recovery][info] Listing ${collection} #${tokenId} à ${floor} ETH`)
+      const colConfig = await prisma.userCollection.findFirst({
+        where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
+        select: { relistAfterMin: true }
+      })
+      const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 1440
+
+      const stopLossPrice = parseFloat((buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+      const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
+      console.log(`[recovery][info] Listing ${collection} #${tokenId} à ${listPrice} ETH`)
       try {
-        await listToken({ wallet, user, tradeId: trade.id, collection, tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+        await listToken({ wallet, user, tradeId: trade.id, collection, tokenId, listPrice, isPaperTrade: user.paperTrading, listExpiryMin: relistMin })
       } catch (err) {
         const msg = err.response?.data?.errors?.[0] || err.message
         console.log(`[recovery][error] Échec listing ${collection} #${tokenId}: ${msg}`)
@@ -189,12 +205,20 @@ async function recoverUnlisted({ wallet, user }) {
       continue
     }
 
-    console.log(`[recovery][info] Re-listing ${trade.collection} #${trade.tokenId} à ${floor} ETH`)
+    const colConfig = await prisma.userCollection.findFirst({
+      where: { userId: user.id, collectionAddress: { equals: trade.collection, mode: 'insensitive' } },
+      select: { relistAfterMin: true }
+    })
+    const relistMin = colConfig?.relistAfterMin ?? user.relistAfterMin ?? 1440
+
+    const stopLossPrice = parseFloat((trade.buyPrice * (1 + (user.stopLossPct ?? 1) / 100)).toFixed(4))
+    const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
+    console.log(`[recovery][info] Re-listing ${trade.collection} #${trade.tokenId} à ${listPrice} ETH`)
     await prisma.botLog.create({
-      data: { userId: user.id, level: 'info', module: 'positions', message: `Recovery: re-listing ${trade.collection} #${trade.tokenId} à ${floor} ETH` }
+      data: { userId: user.id, level: 'info', module: 'positions', message: `Recovery: re-listing ${trade.collection} #${trade.tokenId} à ${listPrice} ETH` }
     })
 
-    await listToken({ wallet, user, tradeId: trade.id, collection: trade.collection, tokenId: trade.tokenId, listPrice: floor, isPaperTrade: user.paperTrading })
+    await listToken({ wallet, user, tradeId: trade.id, collection: trade.collection, tokenId: trade.tokenId, listPrice, isPaperTrade: user.paperTrading, listExpiryMin: relistMin })
   }
 }
 

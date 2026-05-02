@@ -62,7 +62,7 @@ async function getAllFees(collectionAddress) {
   }
 }
 
-async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 10080 }) {
+async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 1440 }) {
   const label = isPaperTrade ? ' [PAPER]' : ''
 
   if (isPaperTrade) {
@@ -94,7 +94,7 @@ async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice
     })
 
     const sellerAmount = listPriceWei - totalFeesWei
-    const minutes   = Math.max(listExpiryMin ?? 10080, 15) // minimum 15 min
+    const minutes   = Math.max(listExpiryMin ?? 1440, 15) // minimum 15 min
     const startTime = Math.floor(Date.now() / 1000).toString()
     const endTime   = (Math.floor(Date.now() / 1000) + minutes * 60).toString()
     const salt         = Math.floor(Math.random() * 1e15).toString()
