@@ -50,11 +50,27 @@ async function checkNewPositions({ wallet, user }) {
     return
   }
 
+  // nfts filtré = collections actives uniquement (pour détecter les nouveaux achats)
   const nfts = allNfts.filter(n => addressSet.has(n.contractAddress.toLowerCase()))
+  // allCurrent = TOUS les NFTs du wallet (pour la détection sold — inclut collections désactivées)
+  const allCurrent = new Set(allNfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
 
   const walletKey = user.walletAddress
   if (!knownPositions.has(walletKey)) {
-    const initial = new Set(nfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
+    // Initialiser avec tous les NFTs des collections suivies (actives ET avec trades actifs)
+    const trackedCols = await prisma.trade.findMany({
+      where: { userId: user.id, status: { in: ['bought', 'listed', 'stop_loss'] } },
+      select: { collection: true },
+      distinct: ['collection']
+    })
+    const trackedSet = new Set([
+      ...collections.map(c => c.collectionAddress.toLowerCase()),
+      ...trackedCols.map(t => t.collection.toLowerCase())
+    ])
+    const initial = new Set(
+      allNfts.filter(n => trackedSet.has(n.contractAddress.toLowerCase()))
+             .map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`)
+    )
     knownPositions.set(walletKey, initial)
     return
   }
@@ -69,8 +85,8 @@ async function checkNewPositions({ wallet, user }) {
     await handleNewNFT({ wallet, user, collection: nft.contractAddress.toLowerCase(), tokenId: nft.tokenId })
   }
 
-  // Nettoie les positions vendues — seulement si l'API a répondu correctement
-  const current = new Set(nfts.map(n => `${n.contractAddress.toLowerCase()}:${n.tokenId}`))
+  // Détection sold : utilise allCurrent (tous les NFTs du wallet, pas seulement collections actives)
+  const current = allCurrent
   if (!missCounters.has(walletKey)) missCounters.set(walletKey, new Map())
   const misses = missCounters.get(walletKey)
 
