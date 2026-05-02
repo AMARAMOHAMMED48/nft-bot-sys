@@ -15,14 +15,24 @@ router.get('/', async (req, res) => {
 })
 
 router.post('/', async (req, res) => {
-  const { collectionAddress, collectionName } = req.body
+  const { collectionAddress, collectionName, offerBelowFloorPct, stopLossPct, offerMaxActive } = req.body
   if (!collectionAddress || !collectionName) {
     return res.status(400).json({ error: 'Adresse et nom requis' })
+  }
+  if (offerBelowFloorPct == null || stopLossPct == null) {
+    return res.status(400).json({ error: 'Sous le floor (%) et stop-loss requis' })
   }
 
   try {
     const collection = await prisma.userCollection.create({
-      data: { userId: req.user.id, collectionAddress, collectionName }
+      data: {
+        userId: req.user.id,
+        collectionAddress,
+        collectionName,
+        offerBelowFloorPct: parseFloat(offerBelowFloorPct),
+        stopLossPct: parseFloat(stopLossPct),
+        offerMaxActive: offerMaxActive != null ? parseInt(offerMaxActive) : 5
+      }
     })
     res.status(201).json(collection)
   } catch (err) {

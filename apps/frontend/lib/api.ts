@@ -29,8 +29,8 @@ export const api = {
 
   // Collections
   getCollections: () => apiFetch('/api/collections'),
-  addCollection: (collectionAddress: string, collectionName: string) =>
-    apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ collectionAddress, collectionName }) }),
+  addCollection: (collectionAddress: string, collectionName: string, offerBelowFloorPct: number, stopLossPct: number, offerMaxActive: number) =>
+    apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ collectionAddress, collectionName, offerBelowFloorPct, stopLossPct, offerMaxActive }) }),
   toggleCollection: (id: string, enabled: boolean) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
   updateCollectionConfig: (id: string, data: { enabled?: boolean, offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number }) =>

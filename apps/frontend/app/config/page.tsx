@@ -31,6 +31,9 @@ export default function ConfigPage() {
   const [config, setConfig] = useState<Config | null>(null)
   const [newAddr, setNewAddr] = useState('')
   const [newName, setNewName] = useState('')
+  const [newBelowPct, setNewBelowPct] = useState('5')
+  const [newSlPct, setNewSlPct] = useState('10')
+  const [newMaxActive, setNewMaxActive] = useState('5')
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -49,9 +52,18 @@ export default function ConfigPage() {
   async function addCollection(e: React.FormEvent) {
     e.preventDefault()
     try {
-      await api.addCollection(newAddr.trim(), newName.trim())
+      await api.addCollection(
+        newAddr.trim(),
+        newName.trim(),
+        parseFloat(newBelowPct),
+        parseFloat(newSlPct),
+        parseInt(newMaxActive)
+      )
       setNewAddr('')
       setNewName('')
+      setNewBelowPct('5')
+      setNewSlPct('10')
+      setNewMaxActive('5')
       setMsg('Collection ajoutée')
       load()
     } catch (err: unknown) {
@@ -106,12 +118,31 @@ export default function ConfigPage() {
 
         {/* Collections */}
         <Section title="Collections surveillées">
-          <form onSubmit={addCollection} style={styles.row}>
-            <input style={{ ...styles.input, flex: 2 }} placeholder="Adresse contrat (0x...)"
-              value={newAddr} onChange={e => setNewAddr(e.target.value)} required />
-            <input style={{ ...styles.input, flex: 1 }} placeholder="Nom (ex: BAYC)"
-              value={newName} onChange={e => setNewName(e.target.value)} required />
-            <button style={styles.btn} type="submit">Ajouter</button>
+          <form onSubmit={addCollection} style={styles.addForm}>
+            <div style={styles.addRow1}>
+              <input style={{ ...styles.input, flex: 2 }} placeholder="Adresse contrat (0x...)"
+                value={newAddr} onChange={e => setNewAddr(e.target.value)} required />
+              <input style={{ ...styles.input, flex: 1 }} placeholder="Nom (ex: BAYC)"
+                value={newName} onChange={e => setNewName(e.target.value)} required />
+            </div>
+            <div style={styles.addRow2}>
+              <div style={styles.addField}>
+                <label style={styles.addLabel}>Sous le floor (%)</label>
+                <input style={styles.input} type="number" step="0.1" min="0" required
+                  value={newBelowPct} onChange={e => setNewBelowPct(e.target.value)} />
+              </div>
+              <div style={styles.addField}>
+                <label style={styles.addLabel}>Stop-loss (%)</label>
+                <input style={styles.input} type="number" step="0.1" min="0" required
+                  value={newSlPct} onChange={e => setNewSlPct(e.target.value)} />
+              </div>
+              <div style={styles.addField}>
+                <label style={styles.addLabel}>Max offres actives</label>
+                <input style={styles.input} type="number" step="1" min="1" required
+                  value={newMaxActive} onChange={e => setNewMaxActive(e.target.value)} />
+              </div>
+              <button style={{ ...styles.btn, alignSelf: 'flex-end' }} type="submit">Ajouter</button>
+            </div>
           </form>
 
           {collections.length === 0
@@ -282,6 +313,11 @@ const styles: Record<string, React.CSSProperties> = {
   section: { background: '#1a1a2e', borderRadius: 10, padding: 24, border: '1px solid #2d2d4e' },
   sectionTitle: { fontSize: 16, fontWeight: 600, margin: '0 0 20px', color: '#c4b5fd' },
   row: { display: 'flex', alignItems: 'center', gap: 12 },
+  addForm: { display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 },
+  addRow1: { display: 'flex', gap: 12 },
+  addRow2: { display: 'flex', gap: 12, alignItems: 'flex-end' },
+  addField: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
+  addLabel: { color: '#94a3b8', fontSize: 12 },
   collectionRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #2d2d4e' },
   configForm: { display: 'flex', flexDirection: 'column', gap: 16 },
   configRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
