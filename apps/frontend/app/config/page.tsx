@@ -8,24 +8,18 @@ type Collection = {
   collectionAddress: string
   collectionName: string
   enabled: boolean
-  offerBelowFloorPct: number | null
-  stopLossPct: number | null
-  offerExpiryMin: number | null
-  relistAfterMin: number | null
+  offerBelowFloorPct: number
+  stopLossPct: number
+  offerMaxActive: number
 }
 
 type Config = {
   paperTrading: boolean
-  offerBelowFloorPct: number | null
-  offerMaxActive: number
   budgetMaxEth: number
-  stopLossPct: number
-  buyTriggerPct: number
   maxGasGwei: number
   offerExpiryMin: number
   relistAfterMin: number
   timeoutSellH: number
-  maxPositions: number
   discordWebhook: string | null
   autoWrapAfterSale: boolean
   ethReserveGas: number
@@ -144,22 +138,12 @@ export default function ConfigPage() {
               </button>
             </div>
 
-            <Field label="Sous le floor (%) — ex: 5 → offre = floor × 95%" type="number" step="0.1"
-              value={(config as any).offerBelowFloorPct ?? ''} onChange={v => updateConfig('offerBelowFloorPct', v ? parseFloat(v) : null)} />
-            <Field label="Durée offre (minutes, min: 10, ex: 15 / 60 / 1440)" type="number" step="1"
-              value={(config as any).offerExpiryMin ?? 1440} onChange={v => updateConfig('offerExpiryMin', parseInt(v))} />
-            <Field label="Durée listing & auto-relist (minutes, min: 15, ex: 15 / 60 / 1440)" type="number" step="1"
-              value={(config as any).relistAfterMin ?? 15} onChange={v => updateConfig('relistAfterMin', parseInt(v))} />
+            <Field label="Durée offre (minutes, ex: 15 / 60 / 1440)" type="number" step="1"
+              value={config.offerExpiryMin} onChange={v => updateConfig('offerExpiryMin', parseInt(v))} />
+            <Field label="Durée listing & auto-relist (minutes, ex: 15 / 60 / 1440)" type="number" step="1"
+              value={config.relistAfterMin} onChange={v => updateConfig('relistAfterMin', parseInt(v))} />
             <Field label="Budget max (ETH)" type="number" step="0.01"
               value={config.budgetMaxEth} onChange={v => updateConfig('budgetMaxEth', parseFloat(v))} />
-            <Field label="Stop-loss (% sous prix d'achat) — ex: 10 → vend si floor < achat × 90%" type="number" step="0.1"
-              value={config.stopLossPct} onChange={v => updateConfig('stopLossPct', parseFloat(v))} />
-            <Field label="Max offres actives" type="number" step="1"
-              value={config.offerMaxActive} onChange={v => updateConfig('offerMaxActive', parseInt(v))} />
-            <Field label="Max positions" type="number" step="1"
-              value={config.maxPositions} onChange={v => updateConfig('maxPositions', parseInt(v))} />
-            <Field label="Seuil snipe (% floor, ex: 0.88)" type="number" step="0.01"
-              value={config.buyTriggerPct} onChange={v => updateConfig('buyTriggerPct', parseFloat(v))} />
             <Field label="Gas max (Gwei)" type="number" step="1"
               value={config.maxGasGwei} onChange={v => updateConfig('maxGasGwei', parseInt(v))} />
             <Field label="Timeout listing (heures)" type="number" step="1"
@@ -192,13 +176,12 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
   col: Collection
   onToggle: () => void
   onDelete: () => void
-  onSave: (data: { offerBelowFloorPct?: number | null, stopLossPct?: number | null, offerExpiryMin?: number | null, relistAfterMin?: number | null }) => void
+  onSave: (data: { offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number }) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [belowPct, setBelowPct] = useState(col.offerBelowFloorPct?.toString() ?? '')
-  const [slPct, setSlPct] = useState(col.stopLossPct?.toString() ?? '')
-  const [expiry, setExpiry] = useState(col.offerExpiryMin?.toString() ?? '')
-  const [relist, setRelist] = useState(col.relistAfterMin?.toString() ?? '')
+  const [belowPct, setBelowPct] = useState(col.offerBelowFloorPct.toString())
+  const [slPct, setSlPct] = useState(col.stopLossPct.toString())
+  const [maxActive, setMaxActive] = useState(col.offerMaxActive.toString())
 
   return (
     <div style={{ borderBottom: '1px solid #2d2d4e' }}>
@@ -208,17 +191,9 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
             {expanded ? '▾' : '▸'} {col.collectionName}
           </p>
           <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{col.collectionAddress}</p>
-          {(col.offerBelowFloorPct || col.stopLossPct || col.offerExpiryMin || col.relistAfterMin) && (
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#7c3aed' }}>
-              {col.offerBelowFloorPct != null ? `Offre: -${col.offerBelowFloorPct}%` : 'Offre: global'}
-              {' · '}
-              {col.stopLossPct != null ? `SL: -${col.stopLossPct}%` : 'SL: global'}
-              {' · '}
-              {col.offerExpiryMin ? `Offre dur: ${col.offerExpiryMin}min` : 'Offre dur: global'}
-              {' · '}
-              {col.relistAfterMin ? `Relist: ${col.relistAfterMin}min` : 'Relist: global'}
-            </p>
-          )}
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: '#7c3aed' }}>
+            {`Offre: -${col.offerBelowFloorPct}% · SL: -${col.stopLossPct}% · Max offres: ${col.offerMaxActive}`}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={{ ...styles.smallBtn, background: col.enabled ? '#22c55e' : '#4b5563' }} onClick={onToggle}>
@@ -230,58 +205,37 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
 
       {expanded && (
         <div style={{ padding: '12px 0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
-            Config spécifique (vide = utilise la config globale)
-          </p>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 120 }}>
               <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
                 Sous le floor (%)
               </label>
-              <input style={styles.input} type="number" step="0.1" placeholder="Global"
+              <input style={styles.input} type="number" step="0.1" required
                 value={belowPct} onChange={e => setBelowPct(e.target.value)} />
             </div>
             <div style={{ flex: 1, minWidth: 120 }}>
               <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
                 Stop-loss (%)
               </label>
-              <input style={styles.input} type="number" step="0.1" placeholder="Global"
+              <input style={styles.input} type="number" step="0.1" required
                 value={slPct} onChange={e => setSlPct(e.target.value)} />
             </div>
             <div style={{ flex: 1, minWidth: 120 }}>
               <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
-                Durée offre (min)
+                Max offres actives
               </label>
-              <input style={styles.input} type="number" step="1" placeholder="Global"
-                value={expiry} onChange={e => setExpiry(e.target.value)} />
-            </div>
-            <div style={{ flex: 1, minWidth: 120 }}>
-              <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
-                Listing & relist (min)
-              </label>
-              <input style={styles.input} type="number" step="1" placeholder="Global"
-                value={relist} onChange={e => setRelist(e.target.value)} />
+              <input style={styles.input} type="number" step="1" min="1" required
+                value={maxActive} onChange={e => setMaxActive(e.target.value)} />
             </div>
             <button style={styles.smallBtn} onClick={() => {
               onSave({
-                offerBelowFloorPct: belowPct ? parseFloat(belowPct) : null,
-                stopLossPct: slPct ? parseFloat(slPct) : null,
-                offerExpiryMin: expiry ? parseInt(expiry) : null,
-                relistAfterMin: relist ? parseInt(relist) : null
+                offerBelowFloorPct: parseFloat(belowPct),
+                stopLossPct: parseFloat(slPct),
+                offerMaxActive: parseInt(maxActive)
               })
               setExpanded(false)
             }}>
               Sauver
-            </button>
-            <button style={{ ...styles.smallBtn, background: '#4b5563' }} onClick={() => {
-              onSave({ offerBelowFloorPct: null, stopLossPct: null, offerExpiryMin: null, relistAfterMin: null })
-              setBelowPct('')
-              setSlPct('')
-              setExpiry('')
-              setRelist('')
-              setExpanded(false)
-            }}>
-              Reset
             </button>
           </div>
         </div>

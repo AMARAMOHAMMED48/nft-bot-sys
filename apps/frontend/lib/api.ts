@@ -33,7 +33,7 @@ export const api = {
     apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ collectionAddress, collectionName }) }),
   toggleCollection: (id: string, enabled: boolean) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
-  updateCollectionConfig: (id: string, data: { offerPriceEth?: number | null, offerExpiryMin?: number | null }) =>
+  updateCollectionConfig: (id: string, data: { enabled?: boolean, offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number }) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteCollection: (id: string) =>
     apiFetch(`/api/collections/${id}`, { method: 'DELETE' }),
