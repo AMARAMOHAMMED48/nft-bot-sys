@@ -7,6 +7,7 @@ type Trade = {
   id: string
   tokenId: string
   collection: string
+  collectionName: string | null
   source: string
   buyPrice: number
   sellPrice: number | null
@@ -68,14 +69,16 @@ export default function TradesPage() {
 
   useEffect(() => { load() }, [])
 
-  const collections = Array.from(new Set(trades.map(t => t.collection))).sort()
+  const collections = Array.from(
+    new Map(trades.map(t => [t.collection.toLowerCase(), { addr: t.collection, name: t.collectionName }])).values()
+  ).sort((a, b) => (a.name ?? a.addr).localeCompare(b.name ?? b.addr))
 
   const filtered = trades.filter(t => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false
     if (modeFilter === 'paper' && !t.isPaperTrade) return false
     if (modeFilter === 'real' && t.isPaperTrade) return false
     if (sourceFilter !== 'all' && t.source !== sourceFilter) return false
-    if (colFilter && t.collection.toLowerCase() !== colFilter.toLowerCase()) return false
+    if (colFilter && t.collection.toLowerCase() !== colFilter) return false
     if (search && !t.tokenId.includes(search)) return false
     return true
   })
@@ -160,7 +163,9 @@ export default function TradesPage() {
           <select style={styles.select} value={colFilter} onChange={e => setColFilter(e.target.value)}>
             <option value="">Toutes collections</option>
             {collections.map(c => (
-              <option key={c} value={c}>{c.slice(0, 8)}...{c.slice(-4)}</option>
+              <option key={c.addr} value={c.addr.toLowerCase()}>
+                {c.name ?? `${c.addr.slice(0, 8)}...${c.addr.slice(-4)}`}
+              </option>
             ))}
           </select>
 
@@ -173,11 +178,14 @@ export default function TradesPage() {
           filtered.length === 0 ? <p style={styles.muted}>Aucun trade</p> : (
             <div style={styles.table}>
               <div style={styles.thead}>
-                <span>Token</span><span>Source</span><span>Achat</span><span>Listing</span><span>Vente</span><span>P&L</span><span>Statut</span><span>Mode</span><span>Date</span>
+                <span>Collection</span><span>Source</span><span>Achat</span><span>Listing</span><span>Vente</span><span>P&L</span><span>Statut</span><span>Mode</span><span>Date</span>
               </div>
               {filtered.map(t => (
                 <div key={t.id} style={{ ...styles.row, borderLeft: `3px solid ${STATUS_COLORS[t.status] ?? '#2d2d4e'}` }}>
-                  <span style={styles.mono}>#{t.tokenId}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                    {t.collectionName ?? `${t.collection.slice(0, 8)}...`}
+                    <br /><span style={styles.mono}>#{t.tokenId}</span>
+                  </span>
                   <span style={styles.muted}>{t.source === 'snipe' ? '🟢 snipe' : '🎯 offre'}</span>
                   <span>{t.buyPrice} ETH</span>
                   <span style={styles.muted}>{t.listPrice ? `${t.listPrice} ETH` : '—'}</span>

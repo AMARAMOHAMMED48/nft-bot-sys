@@ -10,18 +10,6 @@ async function runOfferCycle(ctx) {
   const { id: userId, maxGasGwei, paperTrading } = user
   const offerExpiryMin = user.offerExpiryMin ?? 1440
 
-  // Annuler les offres expirées ou marquées cancelled par l'API
-  const toCancel = await prisma.offer.findMany({
-    where: {
-      userId,
-      status: { in: ['cancelled'] },
-      isPaperTrade: paperTrading
-    }
-  })
-  for (const offer of toCancel) {
-    await cancelOffer({ wallet, offerId: offer.id, isPaperTrade: paperTrading })
-  }
-
   // Expiration naturelle
   await prisma.offer.updateMany({
     where: {

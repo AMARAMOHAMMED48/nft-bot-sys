@@ -15,12 +15,24 @@ router.get('/', async (req, res) => {
   if (isPaperTrade !== undefined) where.isPaperTrade = isPaperTrade === 'true'
   if (collection) where.collection = { equals: collection, mode: 'insensitive' }
 
-  const trades = await prisma.trade.findMany({
-    where,
-    orderBy: { boughtAt: 'desc' },
-    take: limit
-  })
-  res.json(trades)
+  const [trades, collections] = await Promise.all([
+    prisma.trade.findMany({ where, orderBy: { boughtAt: 'desc' }, take: limit }),
+    prisma.userCollection.findMany({
+      where: { userId: req.user.id },
+      select: { collectionAddress: true, collectionName: true }
+    })
+  ])
+
+  const nameMap = Object.fromEntries(
+    collections.map(c => [c.collectionAddress.toLowerCase(), c.collectionName])
+  )
+
+  const enriched = trades.map(t => ({
+    ...t,
+    collectionName: nameMap[t.collection.toLowerCase()] ?? null
+  }))
+
+  res.json(enriched)
 })
 
 router.get('/pnl', async (req, res) => {
