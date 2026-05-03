@@ -1,8 +1,21 @@
+const axios = require('axios')
 const prisma = require('../lib/prisma')
 const { getFloor } = require('../data/floorPrice')
 const { listToken } = require('../execution/lister')
 const { getEthBalance, getWethBalance, wrapEthToWeth } = require('../execution/wallet')
 const { notify } = require('../notify')
+
+async function walletOwnsNFT(walletAddress, collection, tokenId) {
+  try {
+    const res = await axios.get(
+      `https://eth-mainnet.g.alchemy.com/nft/v3/${process.env.ALCHEMY_API_KEY}/getNFTsForOwner`,
+      { params: { owner: walletAddress, contractAddresses: [collection], withMetadata: false, pageSize: 100 }, timeout: 8000 }
+    )
+    return (res.data.ownedNfts || []).some(n => n.tokenId === tokenId)
+  } catch {
+    return true // erreur API → on assume encore présent pour éviter faux sold
+  }
+}
 
 async function checkStopLoss(user) {
   const activeTrades = await prisma.trade.findMany({
@@ -79,6 +92,18 @@ async function checkExpiredListings({ wallet, user }) {
     // Guard : re-vérifier que le trade n'a pas été vendu entre temps (race condition)
     const freshTrade = await prisma.trade.findUnique({ where: { id: trade.id }, select: { status: true } })
     if (!freshTrade || freshTrade.status === 'sold') continue
+
+    // Vérifier que le NFT est encore dans le wallet avant de tenter le relist
+    const owns = await walletOwnsNFT(user.walletAddress, trade.collection, trade.tokenId)
+    if (!owns) {
+      await prisma.trade.update({ where: { id: trade.id }, data: { status: 'sold', soldAt: new Date() } })
+      await prisma.botLog.create({
+        data: { userId: user.id, level: 'info', module: 'risk',
+          message: `${trade.collection} #${trade.tokenId} marqué sold — NFT absent du wallet (détecté avant relist)` }
+      })
+      await notify(user, `💰 VENDU | ${trade.collection} #${trade.tokenId}\nPrix non disponible — vérifier sur OpenSea`)
+      continue
+    }
 
     const stopLossPrice = parseFloat((trade.buyPrice * (1 + stopLossPct / 100)).toFixed(4))
     const listPrice = parseFloat(Math.max(floor, stopLossPrice).toFixed(4))
