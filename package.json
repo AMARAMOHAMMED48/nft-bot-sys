@@ -9,6 +9,10 @@
     "apps/frontend"
   ],
   "scripts": {
+    "dev": "concurrently --names \"API,BOT,FRONT\" --prefix-colors \"cyan,yellow,magenta\" \"npm run dev:api\" \"npm run dev:bot\" \"npm run dev:front\"",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:bot": "npm run dev --workspace=apps/bot-core",
+    "dev:front": "npm run dev --workspace=apps/frontend",
     "db:generate": "prisma generate --schema=apps/api/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=apps/api/prisma/schema.prisma",
     "db:migrate:prod": "prisma migrate deploy --schema=apps/api/prisma/schema.prisma",
@@ -19,6 +23,7 @@
     "bot-discord": "npm run start --workspace=apps/bot-discord"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "prisma": "^5.22.0"
   },
   "dependencies": {
