@@ -85,6 +85,7 @@ export default function LogsPage() {
           <a href="/offers" style={styles.navLink}>Offres</a>
           <a href="/trades" style={styles.navLink}>Trades</a>
           <a href="/logs" style={{ ...styles.navLink, color: '#c4b5fd' }}>Logs</a>
+          <a href="/snipe" style={styles.navLink}>Snipe</a>
           <a href="/config" style={styles.navLink}>Config</a>
         </div>
       </nav>

@@ -33,7 +33,7 @@ export const api = {
     apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ collectionAddress, collectionName, offerBelowFloorPct, stopLossPct, offerMaxActive }) }),
   toggleCollection: (id: string, enabled: boolean) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
-  updateCollectionConfig: (id: string, data: { enabled?: boolean, offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number }) =>
+  updateCollectionConfig: (id: string, data: { enabled?: boolean, offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number, snipeEnabled?: boolean, buyTriggerPct?: number | null, snipeMaxRank?: number | null }) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteCollection: (id: string) =>
     apiFetch(`/api/collections/${id}`, { method: 'DELETE' }),
@@ -68,6 +68,17 @@ export const api = {
   },
   getPnl: () => apiFetch('/api/trades/pnl'),
   getFloors: () => apiFetch('/api/floors'),
+  // Snipe
+  getSnipeConfig: () => apiFetch('/api/snipe/config'),
+  updateSnipeConfig: (data: Record<string, unknown>) =>
+    apiFetch('/api/snipe/config', { method: 'PUT', body: JSON.stringify(data) }),
+  getSnipeWallet: () => apiFetch('/api/snipe/wallet'),
+  setSnipeWallet: (privateKey: string) =>
+    apiFetch('/api/snipe/wallet', { method: 'POST', body: JSON.stringify({ privateKey }) }),
+  deleteSnipeWallet: () => apiFetch('/api/snipe/wallet', { method: 'DELETE' }),
+  startSnipe: () => apiFetch('/api/snipe/start', { method: 'POST' }),
+  pauseSnipe: () => apiFetch('/api/snipe/pause', { method: 'POST' }),
+
   getLogs: (params: { level?: string; since?: string; limit?: number; offset?: number } = {}) => {
     const q = new URLSearchParams()
     if (params.level) q.set('level', params.level)

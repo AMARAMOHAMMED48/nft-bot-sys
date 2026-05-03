@@ -25,6 +25,7 @@ app.use('/api/trades',      require('./routes/trades'))
 app.use('/api/bot',         require('./routes/bot'))
 app.use('/api/floors',      require('./routes/floors'))
 app.use('/api/logs',        require('./routes/logs'))
+app.use('/api/snipe',       require('./routes/snipe'))
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
