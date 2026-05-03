@@ -37,7 +37,14 @@ async function checkNewPositions({ wallet, user }) {
     where: { userId: user.id, enabled: true },
     select: { collectionAddress: true }
   })
-  if (!collections.length) return
+
+  // Si aucune collection active, continuer seulement s'il y a des trades actifs à surveiller (sold detection)
+  if (!collections.length) {
+    const activeCount = await prisma.trade.count({
+      where: { userId: user.id, status: { in: ['bought', 'listed', 'stop_loss'] } }
+    })
+    if (!activeCount) return
+  }
 
   const addressSet = new Set(collections.map(c => c.collectionAddress.toLowerCase()))
   const allNfts = await fetchAllWalletNFTs(user.walletAddress)
@@ -96,12 +103,10 @@ async function checkNewPositions({ wallet, user }) {
       continue
     }
 
-    // NFT absent ce cycle — incrémenter le compteur avant de conclure
-    const count = (misses.get(key) ?? 0) + 1
-    misses.set(key, count)
-    if (count < 2) continue // attendre 1 cycle de plus pour confirmer
+    // NFT absent → considéré vendu dès le premier cycle manquant
+    // (le walletOwnsNFT check dans checkExpiredListings sert de filet si Alchemy lag ponctuel)
 
-    // 2 cycles consécutifs sans le NFT → considéré vendu
+    // NFT absent ce cycle → considéré vendu
     known.delete(key)
     misses.delete(key)
 
@@ -117,7 +122,7 @@ async function checkNewPositions({ wallet, user }) {
     })
     await prisma.botLog.create({
       data: { userId: user.id, level: 'info', module: 'positions',
-        message: `NFT ${collection} #${tokenId} disparu du wallet (2 cycles) — trade marqué sold` }
+        message: `NFT ${collection} #${tokenId} disparu du wallet — trade marqué sold` }
     })
     await notify(user, `💰 VENDU (détecté wallet) | ${collection} #${tokenId}\nPrix non disponible — vérifier sur OpenSea`)
   }
