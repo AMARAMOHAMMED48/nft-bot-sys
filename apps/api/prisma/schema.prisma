@@ -46,8 +46,8 @@ model UserCollection {
   offerMaxActive     Int      @default(5)
   // Config snipe par collection (optionnel)
   snipeEnabled   Boolean  @default(false)
-  buyTriggerPct  Float?
-  snipeMaxRank   Int?
+  snipeFloorPct  Float?   // % au-dessus du floor : 0 = au floor, 5 = floor+5%, -5 = 5% sous floor
+  snipeMaxRank   Int?     // rang max de rareté (inclus) : 100 → achète si rank <= 100
   createdAt          DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

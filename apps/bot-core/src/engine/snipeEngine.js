@@ -11,17 +11,18 @@ const { notify } = require('../notify')
 const activeSnipeEngines = new Map()
 
 async function checkSnipeConditions({ snipeConfig, userCollection, userId, priceEth, collectionAddress, tokenId }) {
-  // 1. Prix sous floor
-  if (userCollection.buyTriggerPct != null) {
+  // 1. Prix : price <= floor * (1 + snipeFloorPct/100)
+  if (userCollection.snipeFloorPct != null) {
     const floor = getFloor(collectionAddress)
     if (!floor) return false
-    if (priceEth > floor * userCollection.buyTriggerPct) return false
+    const threshold = floor * (1 + userCollection.snipeFloorPct / 100)
+    if (priceEth > threshold) return false
   }
 
-  // 2. Rank de rareté
+  // 2. Rank de rareté : rank <= snipeMaxRank
   if (userCollection.snipeMaxRank != null) {
     const rank = await fetchTokenRank(collectionAddress, tokenId)
-    if (rank === null || rank >= userCollection.snipeMaxRank) return false
+    if (rank === null || rank > userCollection.snipeMaxRank) return false
   }
 
   // 3. Gas
@@ -54,7 +55,7 @@ async function handleListing({ wallet, user, snipeConfig, listing }) {
     where: { userId: user.id, collectionAddress: { equals: collectionAddress, mode: 'insensitive' }, snipeEnabled: true }
   })
   if (!userCollection) return
-  if (!userCollection.buyTriggerPct && !userCollection.snipeMaxRank) return
+  if (userCollection.snipeFloorPct == null && !userCollection.snipeMaxRank) return
 
   const ok = await checkSnipeConditions({
     snipeConfig, userCollection, userId: user.id, priceEth, collectionAddress, tokenId

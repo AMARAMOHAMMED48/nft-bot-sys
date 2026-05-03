@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const { collectionAddress, collectionName, offerBelowFloorPct, stopLossPct, offerMaxActive,
-          snipeEnabled, buyTriggerPct, snipeMaxRank } = req.body
+          snipeEnabled, snipeFloorPct, snipeMaxRank } = req.body
   if (!collectionAddress || !collectionName) {
     return res.status(400).json({ error: 'Adresse et nom requis' })
   }
@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
         stopLossPct: parseFloat(stopLossPct),
         offerMaxActive: offerMaxActive != null ? parseInt(offerMaxActive) : 5,
         snipeEnabled: snipeEnabled === true || snipeEnabled === 'true',
-        buyTriggerPct: buyTriggerPct != null && buyTriggerPct !== '' ? parseFloat(buyTriggerPct) : null,
+        snipeFloorPct: snipeFloorPct != null && snipeFloorPct !== '' ? parseFloat(snipeFloorPct) : null,
         snipeMaxRank: snipeMaxRank != null && snipeMaxRank !== '' ? parseInt(snipeMaxRank) : null
       }
     })
@@ -47,14 +47,14 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const { enabled, offerBelowFloorPct, stopLossPct, offerMaxActive,
-          snipeEnabled, buyTriggerPct, snipeMaxRank } = req.body
+          snipeEnabled, snipeFloorPct, snipeMaxRank } = req.body
   const data = {}
   if (enabled !== undefined) data.enabled = enabled
   if (offerBelowFloorPct !== undefined) data.offerBelowFloorPct = parseFloat(offerBelowFloorPct)
   if (stopLossPct !== undefined) data.stopLossPct = parseFloat(stopLossPct)
   if (offerMaxActive !== undefined) data.offerMaxActive = parseInt(offerMaxActive)
   if (snipeEnabled !== undefined) data.snipeEnabled = snipeEnabled === true || snipeEnabled === 'true'
-  if (buyTriggerPct !== undefined) data.buyTriggerPct = buyTriggerPct === '' || buyTriggerPct === null ? null : parseFloat(buyTriggerPct)
+  if (snipeFloorPct !== undefined) data.snipeFloorPct = snipeFloorPct === '' || snipeFloorPct === null ? null : parseFloat(snipeFloorPct)
   if (snipeMaxRank !== undefined) data.snipeMaxRank = snipeMaxRank === '' || snipeMaxRank === null ? null : parseInt(snipeMaxRank)
 
   try {
