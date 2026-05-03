@@ -6,6 +6,8 @@ const { limiter } = require('./middleware/rateLimit')
 
 const app = express()
 
+app.set('trust proxy', 1)
+
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || [],
   credentials: true
@@ -22,6 +24,8 @@ app.use('/api/offers',      require('./routes/offers'))
 app.use('/api/trades',      require('./routes/trades'))
 app.use('/api/bot',         require('./routes/bot'))
 app.use('/api/floors',      require('./routes/floors'))
+app.use('/api/logs',        require('./routes/logs'))
+app.use('/api/snipe',       require('./routes/snipe'))
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 

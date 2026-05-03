@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -17,22 +16,22 @@ model User {
   walletAddress  String?
   walletKeyEnc   String?
   // Config bot par user
-  paperTrading    Boolean          @default(true)
-  offerBelowFloor Float?
-  offerMaxActive  Int              @default(5)
-  budgetMaxEth    Float            @default(1.0)
-  stopLossEth     Float            @default(0.15)
-  maxGasGwei      Int              @default(35)
-  offerExpiryMin  Int              @default(1440)
-  listExpiryMin   Int              @default(10080)
-  timeoutSellH    Int              @default(72)
-  botEnabled     Boolean          @default(false)
-  discordWebhook String?
+  paperTrading      Boolean  @default(true)
+  budgetMaxEth      Float    @default(1.0)
+  maxGasGwei        Int      @default(35)
+  offerExpiryMin    Int      @default(1440)
+  timeoutSellH      Int      @default(72)
+  relistAfterMin    Int      @default(15)
+  autoWrapAfterSale Boolean  @default(true)
+  ethReserveGas     Float    @default(0.01)
+  botEnabled        Boolean  @default(false)
+  discordWebhook    String?
   createdAt      DateTime         @default(now())
   collections    UserCollection[]
   trades         Trade[]
   offers         Offer[]
   logs           BotLog[]
+  snipeConfig    SnipeConfig?
 }
 
 model UserCollection {
@@ -40,11 +39,16 @@ model UserCollection {
   userId            String
   collectionAddress String
   collectionName    String
-  enabled           Boolean  @default(true)
-  // Config optionnelle par collection (override config globale si renseignée)
-  offerBelowFloor   Float?
-  offerExpiryMin    Int?
-  createdAt         DateTime @default(now())
+  enabled            Boolean  @default(true)
+  // Config obligatoire par collection (offres)
+  offerBelowFloorPct Float
+  stopLossPct        Float
+  offerMaxActive     Int      @default(5)
+  // Config snipe par collection (optionnel)
+  snipeEnabled   Boolean  @default(false)
+  snipeFloorPct  Float?   // % au-dessus du floor : 0 = au floor, 5 = floor+5%, -5 = 5% sous floor
+  snipeMaxRank   Int?     // rang max de rareté (inclus) : 100 → achète si rank <= 100
+  createdAt          DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, collectionAddress])
@@ -102,6 +106,22 @@ model FloorSnapshot {
   recordedAt DateTime @default(now())
 
   @@index([collection, recordedAt])
+}
+
+model SnipeConfig {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  walletAddress  String?
+  walletKeyEnc   String?
+  paperTrading   Boolean  @default(true)
+  enabled        Boolean  @default(false)
+  budgetMaxEth   Float    @default(1.0)
+  maxGasGwei     Int      @default(35)
+  maxPositions   Int      @default(3)
+  ethReserveGas  Float    @default(0.01)
+  discordWebhook String?
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model BotLog {

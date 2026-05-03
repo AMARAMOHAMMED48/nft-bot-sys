@@ -31,29 +31,49 @@ async function fetchBlurFloor(collectionAddress) {
   }
 }
 
+async function fetchReservoirFloor(collectionAddress) {
+  try {
+    const res = await axios.get(
+      `https://api.reservoir.tools/collections/v7`,
+      {
+        params: { id: collectionAddress, limit: 1 },
+        headers: { 'x-api-key': process.env.RESERVOIR_API_KEY },
+        timeout: 8000
+      }
+    )
+    const fp = res.data.collections?.[0]?.floorAsk?.price?.amount?.native
+    return fp ? parseFloat(fp) : null
+  } catch {
+    return null
+  }
+}
+
 async function fetchFloor(collectionAddress) {
   const [alchemy, blur] = await Promise.all([
     fetchAlchemyFloor(collectionAddress),
     fetchBlurFloor(collectionAddress)
   ])
 
-  const candidates = [alchemy, blur].filter(v => v !== null && v > 0)
+  let candidates = [alchemy, blur].filter(v => v !== null && v > 0)
+
+  // Fallback Reservoir si les deux sources principales sont vides
+  let reservoir = null
+  if (!candidates.length) {
+    reservoir = await fetchReservoirFloor(collectionAddress)
+    if (reservoir && reservoir > 0) candidates = [reservoir]
+  }
+
   if (!candidates.length) return
 
-  // Prend le plus bas des deux marketplaces
   const floor = Math.min(...candidates)
   floorCache.set(collectionAddress, floor)
 
   await prisma.floorSnapshot.create({
-    data: {
-      collection: collectionAddress,
-      floorPrice: floor,
-      volume24h: null,
-      listings: null
-    }
+    data: { collection: collectionAddress, floorPrice: floor, volume24h: null, listings: null }
   }).catch(() => {})
 
-  console.log(`[floor] ${collectionAddress.slice(0, 10)}... → ${floor} ETH (alchemy:${alchemy ?? '—'} blur:${blur ?? '—'})`)
+  const src = reservoir && !alchemy && !blur ? 'reservoir' : `alchemy:${alchemy ?? '—'} blur:${blur ?? '—'}`
+  console.log(`[floor] ${collectionAddress.slice(0, 10)}... → ${floor} ETH (${src})`)
 }
 
 const polledCollections = new Set()

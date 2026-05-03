@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "build": "prisma generate && prisma migrate deploy",
     "start": "node index.js",
     "dev": "node --watch index.js",
     "seed": "node scripts/seed.js"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

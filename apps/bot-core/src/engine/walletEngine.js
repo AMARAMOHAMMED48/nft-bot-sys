@@ -1,7 +1,7 @@
 const prisma = require('../lib/prisma')
 const { loadWallet } = require('../execution/wallet')
 const { runOfferCycle } = require('./offerEngine')
-const { checkStopLoss, onSale } = require('./riskManager')
+const { checkStopLoss, checkExpiredListings, onSale } = require('./riskManager')
 const { on } = require('../data/events')
 const { startPositionMonitor } = require('../monitor/positions')
 
@@ -25,13 +25,15 @@ function startEngine(user) {
       return
     }
 
+    await checkExpiredListings({ wallet, user: freshUser })
+
     await runOfferCycle({ wallet, user: freshUser })
   }, 60_000)
 
   activeEngines.set(user.id, { interval, wallet })
 
   // Ventes détectées via polling OpenSea
-  on('sale', data => onSale({ user, saleData: data }))
+  on('sale', data => onSale({ wallet, user, saleData: data }))
 
   // Moniteur wallet — détecte les offres acceptées
   startPositionMonitor({ wallet, user })

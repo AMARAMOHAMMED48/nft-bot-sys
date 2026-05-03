@@ -1,6 +1,7 @@
 const axios = require('axios')
 const { ethers } = require('ethers')
 const prisma = require('../lib/prisma')
+const { notify } = require('../notify')
 
 const SEAPORT_ADDRESS  = '0x0000000000000068F116a894984e2DB1123eB395'
 const OPENSEA_CONDUIT  = '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000'
@@ -61,12 +62,24 @@ async function getAllFees(collectionAddress) {
   }
 }
 
-async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 10080 }) {
+async function listToken({ wallet, user, tradeId, collection, tokenId, listPrice, isPaperTrade, listExpiryMin = 15 }) {
+  const label = isPaperTrade ? ' [PAPER]' : ''
+
+  let collectionLabel = collection
+  if (user) {
+    const col = await prisma.userCollection.findFirst({
+      where: { userId: user.id, collectionAddress: { equals: collection, mode: 'insensitive' } },
+      select: { collectionName: true }
+    })
+    if (col?.collectionName) collectionLabel = col.collectionName
+  }
+
   if (isPaperTrade) {
     await prisma.trade.update({
       where: { id: tradeId },
       data: { listPrice, status: 'listed', listedAt: new Date() }
     })
+    if (user) await notify(user, `📋 LISTING${label} | ${collectionLabel} #${tokenId}\nPrix: ${listPrice} ETH`)
     return { txHash: null }
   }
 
@@ -90,7 +103,7 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
     })
 
     const sellerAmount = listPriceWei - totalFeesWei
-    const minutes   = Math.max(listExpiryMin ?? 10080, 15) // minimum 15 min
+    const minutes   = Math.max(listExpiryMin ?? 15, 15) // minimum 15 min
     const startTime = Math.floor(Date.now() / 1000).toString()
     const endTime   = (Math.floor(Date.now() / 1000) + minutes * 60).toString()
     const salt         = Math.floor(Math.random() * 1e15).toString()
@@ -108,9 +121,11 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
       ...feeItems
     ]
 
-    const orderParams = {
+    const SIGNED_ZONE = '0x000056f7000000ece9003ca63978907a00ffd100'
+
+    const buildOrder = (orderType, zone) => ({
       offerer:    wallet.address,
-      zone:       ethers.ZeroAddress,
+      zone,
       offer: [{
         itemType: 2,  // ERC721
         token: collection,
@@ -119,7 +134,7 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
         endAmount:   '1'
       }],
       consideration,
-      orderType:  0,  // FULL_OPEN
+      orderType,
       startTime,
       endTime,
       zoneHash:   ethers.ZeroHash,
@@ -127,16 +142,32 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
       conduitKey: OPENSEA_CONDUIT,
       totalOriginalConsiderationItems: consideration.length,
       counter:    '0'
-    }
+    })
 
     const domain = { name: 'Seaport', version: '1.6', chainId: 1, verifyingContract: SEAPORT_ADDRESS }
-    const signature = await wallet.signTypedData(domain, SEAPORT_TYPES, orderParams)
 
-    const submitRes = await axios.post(
-      'https://api.opensea.io/api/v2/orders/ethereum/seaport/listings',
-      { parameters: orderParams, signature, protocol_address: SEAPORT_ADDRESS },
-      { headers: { 'x-api-key': process.env.OPENSEA_API_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
-    )
+    const trySubmit = async (orderType, zone) => {
+      const orderParams = buildOrder(orderType, zone)
+      const signature = await wallet.signTypedData(domain, SEAPORT_TYPES, orderParams)
+      return axios.post(
+        'https://api.opensea.io/api/v2/orders/ethereum/seaport/listings',
+        { parameters: orderParams, signature, protocol_address: SEAPORT_ADDRESS },
+        { headers: { 'x-api-key': process.env.OPENSEA_API_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
+      )
+    }
+
+    let submitRes
+    try {
+      submitRes = await trySubmit(0, ethers.ZeroAddress)  // FULL_OPEN
+    } catch (firstErr) {
+      const firstMsg = firstErr.response?.data?.errors?.[0] || firstErr.message
+      if (firstMsg?.includes('Signed Zone')) {
+        console.log(`[lister] Collection requiert SignedZone — retry FULL_RESTRICTED`)
+        submitRes = await trySubmit(2, SIGNED_ZONE)       // FULL_RESTRICTED
+      } else {
+        throw firstErr
+      }
+    }
 
     const orderId = submitRes.data.listing?.order_hash ?? submitRes.data.order?.order_hash
 
@@ -146,6 +177,7 @@ async function listToken({ wallet, tradeId, collection, tokenId, listPrice, isPa
     })
 
     console.log(`[lister] ✅ Listé ${collection} #${tokenId} à ${listPrice} ETH | order: ${orderId}`)
+    if (user) await notify(user, `📋 LISTING${label} | ${collectionLabel} #${tokenId}\nPrix: ${listPrice} ETH | Order: ${orderId?.slice(0, 10)}...`)
     return { txHash: orderId }
 
   } catch (err) {

@@ -29,11 +29,11 @@ export const api = {
 
   // Collections
   getCollections: () => apiFetch('/api/collections'),
-  addCollection: (collectionAddress: string, collectionName: string) =>
-    apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ collectionAddress, collectionName }) }),
+  addCollection: (collectionAddress: string, collectionName: string, offerBelowFloorPct: number, stopLossPct: number, offerMaxActive: number) =>
+    apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ collectionAddress, collectionName, offerBelowFloorPct, stopLossPct, offerMaxActive }) }),
   toggleCollection: (id: string, enabled: boolean) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
-  updateCollectionConfig: (id: string, data: { offerPriceEth?: number | null, offerExpiryMin?: number | null }) =>
+  updateCollectionConfig: (id: string, data: { enabled?: boolean, offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number, snipeEnabled?: boolean, snipeFloorPct?: number | null, snipeMaxRank?: number | null }) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteCollection: (id: string) =>
     apiFetch(`/api/collections/${id}`, { method: 'DELETE' }),
@@ -50,12 +50,41 @@ export const api = {
   resumeBot: () => apiFetch('/api/bot/resume', { method: 'POST' }),
 
   // Offers
-  getOffers: () => apiFetch('/api/offers'),
+  getOffers: (params: { status?: string; isPaperTrade?: boolean } = {}) => {
+    const q = new URLSearchParams()
+    if (params.status) q.set('status', params.status)
+    if (params.isPaperTrade !== undefined) q.set('isPaperTrade', String(params.isPaperTrade))
+    return apiFetch(`/api/offers?${q}`)
+  },
   cancelOffer: (id: string) => apiFetch(`/api/offers/${id}`, { method: 'DELETE' }),
 
   // Trades
-  getTrades: (limit = 50, status = 'all') =>
-    apiFetch(`/api/trades?limit=${limit}&status=${status}`),
+  getTrades: (params: { status?: string; isPaperTrade?: boolean; collection?: string } = {}) => {
+    const q = new URLSearchParams({ limit: '200' })
+    if (params.status) q.set('status', params.status)
+    if (params.isPaperTrade !== undefined) q.set('isPaperTrade', String(params.isPaperTrade))
+    if (params.collection) q.set('collection', params.collection)
+    return apiFetch(`/api/trades?${q}`)
+  },
   getPnl: () => apiFetch('/api/trades/pnl'),
   getFloors: () => apiFetch('/api/floors'),
+  // Snipe
+  getSnipeConfig: () => apiFetch('/api/snipe/config'),
+  updateSnipeConfig: (data: Record<string, unknown>) =>
+    apiFetch('/api/snipe/config', { method: 'PUT', body: JSON.stringify(data) }),
+  getSnipeWallet: () => apiFetch('/api/snipe/wallet'),
+  setSnipeWallet: (privateKey: string) =>
+    apiFetch('/api/snipe/wallet', { method: 'POST', body: JSON.stringify({ privateKey }) }),
+  deleteSnipeWallet: () => apiFetch('/api/snipe/wallet', { method: 'DELETE' }),
+  startSnipe: () => apiFetch('/api/snipe/start', { method: 'POST' }),
+  pauseSnipe: () => apiFetch('/api/snipe/pause', { method: 'POST' }),
+
+  getLogs: (params: { level?: string; since?: string; limit?: number; offset?: number } = {}) => {
+    const q = new URLSearchParams()
+    if (params.level) q.set('level', params.level)
+    if (params.since) q.set('since', params.since)
+    if (params.limit) q.set('limit', String(params.limit))
+    if (params.offset) q.set('offset', String(params.offset))
+    return apiFetch(`/api/logs?${q}`)
+  },
 }
