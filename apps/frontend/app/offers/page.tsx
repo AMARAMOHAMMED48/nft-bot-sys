@@ -77,6 +77,7 @@ export default function OffersPage() {
           <a href="/offers" style={{ ...styles.navLink, color: '#c4b5fd' }}>Offres</a>
           <a href="/trades" style={styles.navLink}>Trades</a>
           <a href="/logs" style={styles.navLink}>Logs</a>
+          <a href="/snipe" style={styles.navLink}>Snipe</a>
           <a href="/config" style={styles.navLink}>Config</a>
         </div>
       </nav>

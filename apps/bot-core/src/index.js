@@ -4,6 +4,7 @@ const { connect, addCollection: addEventCollection } = require('./data/events')
 const { startFloorPoller, addCollection: addFloorCollection } = require('./data/floorPrice')
 const { startGasPoller } = require('./data/gasPrice')
 const { startEngine, stopEngine, isRunning } = require('./engine/walletEngine')
+const { startSnipeEngine, stopSnipeEngine, isSnipeRunning } = require('./engine/snipeEngine')
 
 async function bootstrap() {
   const allCollections = await prisma.userCollection.findMany({
@@ -32,6 +33,12 @@ async function bootstrap() {
   })
   for (const user of activeUsers) startEngine(user)
 
+  // Snipe engine — indépendant du bot d'offres
+  const snipeUsers = await prisma.user.findMany({
+    where: { snipeConfig: { enabled: true, walletKeyEnc: { not: null } } }
+  })
+  for (const user of snipeUsers) startSnipeEngine(user)
+
   // Polling toutes les 30s : users + nouvelles collections
   setInterval(async () => {
     // Users
@@ -52,6 +59,14 @@ async function bootstrap() {
     for (const col of currentCollections) {
       addFloorCollection(col.collectionAddress)
       addEventCollection(col.collectionAddress)
+    }
+
+    // Sync snipe engines
+    const allUsers = await prisma.user.findMany({ where: { walletKeyEnc: { not: null } } })
+    for (const user of allUsers) {
+      const sc = await prisma.snipeConfig.findUnique({ where: { userId: user.id } })
+      if (sc?.enabled && sc?.walletKeyEnc && !isSnipeRunning(user.id)) startSnipeEngine(user)
+      else if ((!sc?.enabled || !sc?.walletKeyEnc) && isSnipeRunning(user.id)) stopSnipeEngine(user.id)
     }
 
     // Collections désactivées mais avec trades actifs → floor uniquement (pour relist/stop-loss)

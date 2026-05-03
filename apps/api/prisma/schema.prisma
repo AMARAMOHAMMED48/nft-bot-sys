@@ -31,6 +31,7 @@ model User {
   trades         Trade[]
   offers         Offer[]
   logs           BotLog[]
+  snipeConfig    SnipeConfig?
 }
 
 model UserCollection {
@@ -39,10 +40,14 @@ model UserCollection {
   collectionAddress String
   collectionName    String
   enabled            Boolean  @default(true)
-  // Config obligatoire par collection
+  // Config obligatoire par collection (offres)
   offerBelowFloorPct Float
   stopLossPct        Float
   offerMaxActive     Int      @default(5)
+  // Config snipe par collection (optionnel)
+  snipeEnabled   Boolean  @default(false)
+  buyTriggerPct  Float?
+  snipeMaxRank   Int?
   createdAt          DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -101,6 +106,22 @@ model FloorSnapshot {
   recordedAt DateTime @default(now())
 
   @@index([collection, recordedAt])
+}
+
+model SnipeConfig {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  walletAddress  String?
+  walletKeyEnc   String?
+  paperTrading   Boolean  @default(true)
+  enabled        Boolean  @default(false)
+  budgetMaxEth   Float    @default(1.0)
+  maxGasGwei     Int      @default(35)
+  maxPositions   Int      @default(3)
+  ethReserveGas  Float    @default(0.01)
+  discordWebhook String?
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model BotLog {

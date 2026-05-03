@@ -11,6 +11,9 @@ type Collection = {
   offerBelowFloorPct: number
   stopLossPct: number
   offerMaxActive: number
+  snipeEnabled: boolean
+  buyTriggerPct: number | null
+  snipeMaxRank: number | null
 }
 
 type Config = {
@@ -110,6 +113,7 @@ export default function ConfigPage() {
           <a href="/offers" style={styles.navLink}>Offres</a>
           <a href="/trades" style={styles.navLink}>Trades</a>
           <a href="/logs" style={styles.navLink}>Logs</a>
+          <a href="/snipe" style={styles.navLink}>Snipe</a>
           <a href="/config" style={{ ...styles.navLink, color: '#c4b5fd' }}>Config</a>
         </div>
       </nav>
@@ -208,12 +212,15 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
   col: Collection
   onToggle: () => void
   onDelete: () => void
-  onSave: (data: { offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number }) => void
+  onSave: (data: { offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number, snipeEnabled?: boolean, buyTriggerPct?: number | null, snipeMaxRank?: number | null }) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [belowPct, setBelowPct] = useState(col.offerBelowFloorPct.toString())
   const [slPct, setSlPct] = useState(col.stopLossPct.toString())
   const [maxActive, setMaxActive] = useState(col.offerMaxActive.toString())
+  const [snipeEnabled, setSnipeEnabled] = useState(col.snipeEnabled)
+  const [buyTriggerPct, setBuyTriggerPct] = useState(col.buyTriggerPct?.toString() ?? '')
+  const [snipeMaxRank, setSnipeMaxRank] = useState(col.snipeMaxRank?.toString() ?? '')
 
   return (
     <div style={{ borderBottom: '1px solid #2d2d4e' }}>
@@ -225,6 +232,11 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
           <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{col.collectionAddress}</p>
           <p style={{ margin: '2px 0 0', fontSize: 11, color: '#7c3aed' }}>
             {`Offre: -${col.offerBelowFloorPct}% · SL: -${col.stopLossPct}% · Max offres: ${col.offerMaxActive}`}
+            {col.snipeEnabled && (
+              <span style={{ color: '#60a5fa', marginLeft: 6 }}>
+                {`· Snipe${col.buyTriggerPct != null ? ` ≤${(col.buyTriggerPct * 100).toFixed(0)}%` : ''}${col.snipeMaxRank != null ? ` rank<${col.snipeMaxRank}` : ''}`}
+              </span>
+            )}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -263,12 +275,40 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
               onSave({
                 offerBelowFloorPct: parseFloat(belowPct),
                 stopLossPct: parseFloat(slPct),
-                offerMaxActive: parseInt(maxActive)
+                offerMaxActive: parseInt(maxActive),
+                snipeEnabled,
+                buyTriggerPct: buyTriggerPct ? parseFloat(buyTriggerPct) : null,
+                snipeMaxRank: snipeMaxRank ? parseInt(snipeMaxRank) : null
               })
               setExpanded(false)
             }}>
               Sauver
             </button>
+          </div>
+
+          {/* Config snipe */}
+          <div style={{ borderTop: '1px solid #2d2d4e', paddingTop: 12, marginTop: 4 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>Snipe</p>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12, cursor: 'pointer' }}>
+                <input type="checkbox" checked={snipeEnabled} onChange={e => setSnipeEnabled(e.target.checked)} />
+                Snipe activé
+              </label>
+              <div style={{ flex: 1, minWidth: 140 }}>
+                <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
+                  Prix max (×floor) ex: 0.90
+                </label>
+                <input style={styles.input} type="number" step="0.01" min="0" max="1" placeholder="ex: 0.90"
+                  value={buyTriggerPct} onChange={e => setBuyTriggerPct(e.target.value)} />
+              </div>
+              <div style={{ flex: 1, minWidth: 140 }}>
+                <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
+                  Rank max (rareté) ex: 500
+                </label>
+                <input style={styles.input} type="number" step="1" min="1" placeholder="ex: 500"
+                  value={snipeMaxRank} onChange={e => setSnipeMaxRank(e.target.value)} />
+              </div>
+            </div>
           </div>
         </div>
       )}
