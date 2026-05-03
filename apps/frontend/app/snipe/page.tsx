@@ -19,7 +19,7 @@ type Collection = {
   collectionName: string
   collectionAddress: string
   snipeEnabled: boolean
-  buyTriggerPct: number | null
+  snipeFloorPct: number | null
   snipeMaxRank: number | null
 }
 
@@ -193,16 +193,16 @@ export default function SnipePage() {
           ) : (
             <div style={styles.table}>
               <div style={styles.thead}>
-                <span>Collection</span><span>Prix max (×floor)</span><span>Rank max</span>
+                <span>Collection</span><span>Prix max</span><span>Rank max</span>
               </div>
               {activeSnipeCollections.map(c => (
                 <div key={c.id} style={styles.row}>
                   <span style={{ fontWeight: 600 }}>{c.collectionName}</span>
                   <span style={{ color: '#7c3aed' }}>
-                    {c.buyTriggerPct != null ? `≤ ${(c.buyTriggerPct * 100).toFixed(0)}% floor` : '—'}
+                    {c.snipeFloorPct != null ? `floor${c.snipeFloorPct >= 0 ? '+' : ''}${c.snipeFloorPct}%` : '—'}
                   </span>
                   <span style={{ color: '#60a5fa' }}>
-                    {c.snipeMaxRank != null ? `< ${c.snipeMaxRank}` : '—'}
+                    {c.snipeMaxRank != null ? `≤ ${c.snipeMaxRank}` : '—'}
                   </span>
                 </div>
               ))}

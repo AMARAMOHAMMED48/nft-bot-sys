@@ -33,7 +33,7 @@ export const api = {
     apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ collectionAddress, collectionName, offerBelowFloorPct, stopLossPct, offerMaxActive }) }),
   toggleCollection: (id: string, enabled: boolean) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }),
-  updateCollectionConfig: (id: string, data: { enabled?: boolean, offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number, snipeEnabled?: boolean, buyTriggerPct?: number | null, snipeMaxRank?: number | null }) =>
+  updateCollectionConfig: (id: string, data: { enabled?: boolean, offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number, snipeEnabled?: boolean, snipeFloorPct?: number | null, snipeMaxRank?: number | null }) =>
     apiFetch(`/api/collections/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteCollection: (id: string) =>
     apiFetch(`/api/collections/${id}`, { method: 'DELETE' }),

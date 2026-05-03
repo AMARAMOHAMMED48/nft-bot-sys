@@ -12,7 +12,7 @@ type Collection = {
   stopLossPct: number
   offerMaxActive: number
   snipeEnabled: boolean
-  buyTriggerPct: number | null
+  snipeFloorPct: number | null
   snipeMaxRank: number | null
 }
 
@@ -212,14 +212,14 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
   col: Collection
   onToggle: () => void
   onDelete: () => void
-  onSave: (data: { offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number, snipeEnabled?: boolean, buyTriggerPct?: number | null, snipeMaxRank?: number | null }) => void
+  onSave: (data: { offerBelowFloorPct?: number, stopLossPct?: number, offerMaxActive?: number, snipeEnabled?: boolean, snipeFloorPct?: number | null, snipeMaxRank?: number | null }) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [belowPct, setBelowPct] = useState(col.offerBelowFloorPct.toString())
   const [slPct, setSlPct] = useState(col.stopLossPct.toString())
   const [maxActive, setMaxActive] = useState(col.offerMaxActive.toString())
   const [snipeEnabled, setSnipeEnabled] = useState(col.snipeEnabled)
-  const [buyTriggerPct, setBuyTriggerPct] = useState(col.buyTriggerPct?.toString() ?? '')
+  const [snipeFloorPct, setSnipeFloorPct] = useState(col.snipeFloorPct?.toString() ?? '')
   const [snipeMaxRank, setSnipeMaxRank] = useState(col.snipeMaxRank?.toString() ?? '')
 
   return (
@@ -234,7 +234,7 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
             {`Offre: -${col.offerBelowFloorPct}% · SL: -${col.stopLossPct}% · Max offres: ${col.offerMaxActive}`}
             {col.snipeEnabled && (
               <span style={{ color: '#60a5fa', marginLeft: 6 }}>
-                {`· Snipe${col.buyTriggerPct != null ? ` ≤${(col.buyTriggerPct * 100).toFixed(0)}%` : ''}${col.snipeMaxRank != null ? ` rank<${col.snipeMaxRank}` : ''}`}
+                {`· Snipe${col.snipeFloorPct != null ? ` ≤floor${col.snipeFloorPct >= 0 ? '+' : ''}${col.snipeFloorPct}%` : ''}${col.snipeMaxRank != null ? ` rank≤${col.snipeMaxRank}` : ''}`}
               </span>
             )}
           </p>
@@ -277,7 +277,7 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
                 stopLossPct: parseFloat(slPct),
                 offerMaxActive: parseInt(maxActive),
                 snipeEnabled,
-                buyTriggerPct: buyTriggerPct ? parseFloat(buyTriggerPct) : null,
+                snipeFloorPct: snipeFloorPct !== '' ? parseFloat(snipeFloorPct) : null,
                 snipeMaxRank: snipeMaxRank ? parseInt(snipeMaxRank) : null
               })
               setExpanded(false)
@@ -296,14 +296,14 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
               </label>
               <div style={{ flex: 1, minWidth: 140 }}>
                 <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
-                  Prix max (×floor) ex: 0.90
+                  % au-dessus floor (0 = floor, 5 = +5%, -5 = -5%)
                 </label>
-                <input style={styles.input} type="number" step="0.01" min="0" max="1" placeholder="ex: 0.90"
-                  value={buyTriggerPct} onChange={e => setBuyTriggerPct(e.target.value)} />
+                <input style={styles.input} type="number" step="1" placeholder="ex: 0 ou 5"
+                  value={snipeFloorPct} onChange={e => setSnipeFloorPct(e.target.value)} />
               </div>
               <div style={{ flex: 1, minWidth: 140 }}>
                 <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
-                  Rank max (rareté) ex: 500
+                  Rank max (rareté, inclus) ex: 500
                 </label>
                 <input style={styles.input} type="number" step="1" min="1" placeholder="ex: 500"
                   value={snipeMaxRank} onChange={e => setSnipeMaxRank(e.target.value)} />
