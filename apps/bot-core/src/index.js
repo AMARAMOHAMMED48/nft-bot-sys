@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') })
 const prisma = require('./lib/prisma')
 const { connect, addCollection: addEventCollection } = require('./data/events')
 const { startFloorPoller, addCollection: addFloorCollection } = require('./data/floorPrice')
