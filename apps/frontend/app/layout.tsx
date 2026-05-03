@@ -1,4 +1,9 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import ToastProvider from './components/ToastProvider'
+import './globals.css'
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
   title: 'NFT Bot',
@@ -7,9 +12,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
-      <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif', background: '#0f0f13', color: '#e2e8f0' }}>
+    <html lang="fr" className={inter.variable}>
+      <body>
         {children}
+        <ToastProvider />
       </body>
     </html>
   )

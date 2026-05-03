@@ -25,30 +25,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>NFT Bot</h1>
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <input style={styles.input} type="email" placeholder="Email" value={email}
-            onChange={e => setEmail(e.target.value)} required />
-          <input style={styles.input} type="password" placeholder="Mot de passe" value={password}
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="fade-in" style={{ background: 'var(--bg-card)', borderRadius: 14, padding: '40px 36px', width: '100%', maxWidth: 380, border: '1px solid var(--border)' }}>
+        <h1 style={{ textAlign: 'center', marginBottom: 32, fontSize: 26, fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.3px' }}>
+          NFT Bot
+        </h1>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <input className="input" type="email" placeholder="Email" value={email}
+            onChange={e => setEmail(e.target.value)} required autoFocus />
+          <input className="input" type="password" placeholder="Mot de passe" value={password}
             onChange={e => setPassword(e.target.value)} required />
-          {error && <p style={styles.error}>{error}</p>}
-          <button style={styles.btn} type="submit" disabled={loading}>
-            {loading ? 'Connexion...' : 'Se connecter'}
+          {error && <p style={{ color: 'var(--red)', fontSize: 13, margin: 0 }}>{error}</p>}
+          <button className="btn" style={{ background: 'var(--accent)', color: '#fff', marginTop: 4 }}
+            type="submit" disabled={loading}>
+            {loading ? <><span className="spinner" style={{ borderTopColor: '#fff' }} />Connexion...</> : 'Se connecter'}
           </button>
         </form>
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  card: { background: '#1a1a2e', borderRadius: 12, padding: 40, width: 360, border: '1px solid #2d2d4e' },
-  title: { textAlign: 'center', marginBottom: 32, fontSize: 28, fontWeight: 700, color: '#7c3aed' },
-  form: { display: 'flex', flexDirection: 'column', gap: 16 },
-  input: { padding: '12px 16px', borderRadius: 8, border: '1px solid #2d2d4e', background: '#0f0f13', color: '#e2e8f0', fontSize: 15 },
-  btn: { padding: '12px 16px', borderRadius: 8, background: '#7c3aed', color: '#fff', border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  error: { color: '#f87171', fontSize: 14, margin: 0 }
 }

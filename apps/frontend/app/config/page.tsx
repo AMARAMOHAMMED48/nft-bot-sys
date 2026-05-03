@@ -2,29 +2,31 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { useRouter } from 'next/navigation'
+import Nav from '../components/Nav'
 
 type Collection = {
   id: string
   collectionAddress: string
   collectionName: string
   enabled: boolean
-  offerPriceEth: number | null
-  offerExpiryMin: number | null
+  offerBelowFloorPct: number
+  stopLossPct: number
+  offerMaxActive: number
+  snipeEnabled: boolean
+  snipeFloorPct: number | null
+  snipeMaxRank: number | null
 }
 
 type Config = {
   paperTrading: boolean
-  offerBelowFloor: number | null
-  offerMaxActive: number
   budgetMaxEth: number
-  stopLossEth: number
-  buyTriggerPct: number
   maxGasGwei: number
   offerExpiryMin: number
-  listExpiryMin: number
+  relistAfterMin: number
   timeoutSellH: number
-  maxPositions: number
   discordWebhook: string | null
+  autoWrapAfterSale: boolean
+  ethReserveGas: number
 }
 
 export default function ConfigPage() {
@@ -33,17 +35,17 @@ export default function ConfigPage() {
   const [config, setConfig] = useState<Config | null>(null)
   const [newAddr, setNewAddr] = useState('')
   const [newName, setNewName] = useState('')
+  const [newBelowPct, setNewBelowPct] = useState('5')
+  const [newSlPct, setNewSlPct] = useState('10')
+  const [newMaxActive, setNewMaxActive] = useState('5')
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function load() {
     try {
       const [cols, cfg] = await Promise.all([api.getCollections(), api.getConfig()])
-      setCollections(cols)
-      setConfig(cfg)
-    } catch {
-      router.push('/login')
-    }
+      setCollections(cols); setConfig(cfg)
+    } catch { router.push('/login') }
   }
 
   useEffect(() => { load() }, [])
@@ -51,24 +53,10 @@ export default function ConfigPage() {
   async function addCollection(e: React.FormEvent) {
     e.preventDefault()
     try {
-      await api.addCollection(newAddr.trim(), newName.trim())
-      setNewAddr('')
-      setNewName('')
-      setMsg('Collection ajoutée')
-      load()
-    } catch (err: unknown) {
-      setMsg(err instanceof Error ? err.message : 'Erreur')
-    }
-  }
-
-  async function toggleCollection(id: string, enabled: boolean) {
-    await api.toggleCollection(id, !enabled)
-    load()
-  }
-
-  async function deleteCollection(id: string) {
-    await api.deleteCollection(id)
-    load()
+      await api.addCollection(newAddr.trim(), newName.trim(), parseFloat(newBelowPct), parseFloat(newSlPct), parseInt(newMaxActive))
+      setNewAddr(''); setNewName(''); setNewBelowPct('5'); setNewSlPct('10'); setNewMaxActive('5')
+      setMsg('Collection ajoutée'); load()
+    } catch (err: unknown) { setMsg(err instanceof Error ? err.message : 'Erreur') }
   }
 
   async function saveConfig(e: React.FormEvent) {
@@ -76,100 +64,114 @@ export default function ConfigPage() {
     if (!config) return
     setSaving(true)
     try {
-      await api.updateConfig(config)
-      setMsg('Config sauvegardée')
-    } catch (err: unknown) {
-      setMsg(err instanceof Error ? err.message : 'Erreur')
-    } finally {
-      setSaving(false)
-    }
+      await api.updateConfig(config); setMsg('Config sauvegardée')
+    } catch (err: unknown) { setMsg(err instanceof Error ? err.message : 'Erreur') }
+    finally { setSaving(false) }
   }
 
   function updateConfig(field: string, value: unknown) {
     setConfig(prev => prev ? { ...prev, [field]: value } : prev)
   }
 
-  if (!config) return <div style={styles.loading}>Chargement...</div>
+  if (!config) return (
+    <div className="page-loading"><span className="spinner" />Chargement…</div>
+  )
 
   return (
-    <div style={styles.page}>
-      <nav style={styles.nav}>
-        <a href="/dashboard" style={styles.logo}>NFT Bot</a>
-        <div style={styles.navLinks}>
-          <a href="/dashboard" style={styles.navLink}>Dashboard</a>
-          <a href="/offers" style={styles.navLink}>Offres</a>
-          <a href="/trades" style={styles.navLink}>Trades</a>
-          <a href="/config" style={{ ...styles.navLink, color: '#c4b5fd' }}>Config</a>
-        </div>
-      </nav>
-
-      <main style={styles.main}>
+    <div style={{ minHeight: '100vh' }}>
+      <Nav />
+      <main style={{ maxWidth: 760, margin: '0 auto', padding: '32px 20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* Collections */}
-        <Section title="Collections surveillées">
-          <form onSubmit={addCollection} style={styles.row}>
-            <input style={{ ...styles.input, flex: 2 }} placeholder="Adresse contrat (0x...)"
-              value={newAddr} onChange={e => setNewAddr(e.target.value)} required />
-            <input style={{ ...styles.input, flex: 1 }} placeholder="Nom (ex: BAYC)"
-              value={newName} onChange={e => setNewName(e.target.value)} required />
-            <button style={styles.btn} type="submit">Ajouter</button>
+        <div className="section">
+          <h2 className="section-title">Collections surveillées</h2>
+
+          {/* Formulaire ajout */}
+          <form onSubmit={addCollection} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input className="input" style={{ flex: 2 }} placeholder="Adresse contrat (0x…)"
+                value={newAddr} onChange={e => setNewAddr(e.target.value)} required />
+              <input className="input" style={{ flex: 1 }} placeholder="Nom (ex: BAYC)"
+                value={newName} onChange={e => setNewName(e.target.value)} required />
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <FormField label="Sous le floor (%)">
+                <input className="input" type="number" step="0.1" min="0" required
+                  value={newBelowPct} onChange={e => setNewBelowPct(e.target.value)} />
+              </FormField>
+              <FormField label="Stop-loss (%)">
+                <input className="input" type="number" step="0.1" min="0" required
+                  value={newSlPct} onChange={e => setNewSlPct(e.target.value)} />
+              </FormField>
+              <FormField label="Max offres actives">
+                <input className="input" type="number" step="1" min="1" required
+                  value={newMaxActive} onChange={e => setNewMaxActive(e.target.value)} />
+              </FormField>
+              <button className="btn" style={{ background: 'var(--accent)', color: '#fff', alignSelf: 'flex-end' }}
+                type="submit">
+                Ajouter
+              </button>
+            </div>
           </form>
 
           {collections.length === 0
-            ? <p style={styles.muted}>Aucune collection ajoutée</p>
+            ? <p style={{ color: 'var(--muted)', fontSize: 14, margin: 0 }}>Aucune collection ajoutée</p>
             : collections.map(c => (
               <CollectionRow key={c.id} col={c}
-                onToggle={() => toggleCollection(c.id, c.enabled)}
-                onDelete={() => deleteCollection(c.id)}
-                onSave={(data) => api.updateCollectionConfig(c.id, data).then(load)}
+                onToggle={() => api.toggleCollection(c.id, !c.enabled).then(load)}
+                onDelete={() => api.deleteCollection(c.id).then(load)}
+                onSave={data => api.updateCollectionConfig(c.id, data).then(load)}
               />
             ))
           }
-        </Section>
+        </div>
 
         {/* Bot config */}
-        <Section title="Paramètres du bot">
-          <form onSubmit={saveConfig} style={styles.configForm}>
+        <div className="section">
+          <h2 className="section-title">Paramètres du bot</h2>
+          <form onSubmit={saveConfig} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-            <div style={styles.configRow}>
-              <label style={styles.label}>Mode paper trading</label>
-              <button type="button"
-                style={{ ...styles.smallBtn, background: config.paperTrading ? '#f59e0b' : '#22c55e' }}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+              <label style={{ color: 'var(--muted)', fontSize: 13 }}>Mode paper trading</label>
+              <button type="button" className="btn-sm"
+                style={{ background: config.paperTrading ? 'var(--amber)' : 'var(--green)', color: '#fff' }}
                 onClick={() => updateConfig('paperTrading', !config.paperTrading)}>
                 {config.paperTrading ? 'PAPER (simulation)' : 'RÉEL'}
               </button>
             </div>
 
-            <Field label="Sous le floor (ETH) — ex: 0.3 → offre = floor - 0.3" type="number" step="0.001"
-              value={(config as any).offerBelowFloor ?? ''} onChange={v => updateConfig('offerBelowFloor', v ? parseFloat(v) : null)} />
-            <Field label="Durée offre (minutes, min: 10, ex: 15 / 60 / 1440)" type="number" step="1"
-              value={(config as any).offerExpiryMin ?? 1440} onChange={v => updateConfig('offerExpiryMin', parseInt(v))} />
-            <Field label="Durée listing (minutes, min: 15, ex: 15 / 60 / 10080)" type="number" step="1"
-              value={(config as any).listExpiryMin ?? 10080} onChange={v => updateConfig('listExpiryMin', parseInt(v))} />
-            <Field label="Budget max (ETH)" type="number" step="0.01"
-              value={config.budgetMaxEth} onChange={v => updateConfig('budgetMaxEth', parseFloat(v))} />
-            <Field label="Stop-loss (ETH)" type="number" step="0.01"
-              value={config.stopLossEth} onChange={v => updateConfig('stopLossEth', parseFloat(v))} />
-            <Field label="Max offres actives" type="number" step="1"
-              value={config.offerMaxActive} onChange={v => updateConfig('offerMaxActive', parseInt(v))} />
-            <Field label="Max positions" type="number" step="1"
-              value={config.maxPositions} onChange={v => updateConfig('maxPositions', parseInt(v))} />
-            <Field label="Seuil snipe (% floor, ex: 0.88)" type="number" step="0.01"
-              value={config.buyTriggerPct} onChange={v => updateConfig('buyTriggerPct', parseFloat(v))} />
-            <Field label="Gas max (Gwei)" type="number" step="1"
-              value={config.maxGasGwei} onChange={v => updateConfig('maxGasGwei', parseInt(v))} />
-            <Field label="Timeout listing (heures)" type="number" step="1"
-              value={config.timeoutSellH} onChange={v => updateConfig('timeoutSellH', parseInt(v))} />
-            <Field label="Webhook Discord" type="url"
+            <div style={S.grid2}>
+              <ConfigField label="Durée offre (min)" type="number" step="1"
+                value={config.offerExpiryMin} onChange={v => updateConfig('offerExpiryMin', parseInt(v))} />
+              <ConfigField label="Durée listing / relist (min)" type="number" step="1"
+                value={config.relistAfterMin} onChange={v => updateConfig('relistAfterMin', parseInt(v))} />
+              <ConfigField label="Budget max (ETH)" type="number" step="0.01"
+                value={config.budgetMaxEth} onChange={v => updateConfig('budgetMaxEth', parseFloat(v))} />
+              <ConfigField label="Gas max (Gwei)" type="number" step="1"
+                value={config.maxGasGwei} onChange={v => updateConfig('maxGasGwei', parseInt(v))} />
+              <ConfigField label="Timeout listing (heures)" type="number" step="1"
+                value={config.timeoutSellH} onChange={v => updateConfig('timeoutSellH', parseInt(v))} />
+              <ConfigField label="Réserve ETH gas" type="number" step="0.001"
+                value={(config as any).ethReserveGas ?? 0.01} onChange={v => updateConfig('ethReserveGas', parseFloat(v))} />
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontSize: 14 }}>
+              <input type="checkbox" checked={(config as any).autoWrapAfterSale ?? true}
+                onChange={e => updateConfig('autoWrapAfterSale', e.target.checked)} />
+              Auto-swap ETH → WETH après vente
+            </label>
+
+            <ConfigField label="Webhook Discord" type="url"
               value={config.discordWebhook ?? ''} onChange={v => updateConfig('discordWebhook', v || null)} />
 
-            <button style={{ ...styles.btn, marginTop: 8 }} type="submit" disabled={saving}>
-              {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+            <button className="btn" style={{ background: 'var(--accent)', color: '#fff', marginTop: 4 }}
+              type="submit" disabled={saving}>
+              {saving ? <><span className="spinner" style={{ borderTopColor: '#fff' }} />Sauvegarde…</> : 'Sauvegarder'}
             </button>
           </form>
-        </Section>
+        </div>
 
-        {msg && <p style={styles.msg}>{msg}</p>}
+        {msg && <p style={{ color: 'var(--green)', fontSize: 14, margin: 0 }}>{msg}</p>}
       </main>
     </div>
   )
@@ -179,124 +181,130 @@ function CollectionRow({ col, onToggle, onDelete, onSave }: {
   col: Collection
   onToggle: () => void
   onDelete: () => void
-  onSave: (data: { offerPriceEth?: number | null, offerExpiryMin?: number | null }) => void
+  onSave: (data: { offerBelowFloorPct?: number; stopLossPct?: number; offerMaxActive?: number; snipeEnabled?: boolean; snipeFloorPct?: number | null; snipeMaxRank?: number | null }) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [price, setPrice] = useState(col.offerPriceEth?.toString() ?? '')
-  const [expiry, setExpiry] = useState(col.offerExpiryMin?.toString() ?? '')
+  const [belowPct, setBelowPct] = useState(col.offerBelowFloorPct.toString())
+  const [slPct, setSlPct] = useState(col.stopLossPct.toString())
+  const [maxActive, setMaxActive] = useState(col.offerMaxActive.toString())
+  const [snipeEnabled, setSnipeEnabled] = useState(col.snipeEnabled)
+  const [snipeFloorPct, setSnipeFloorPct] = useState(col.snipeFloorPct?.toString() ?? '')
+  const [snipeMaxRank, setSnipeMaxRank] = useState(col.snipeMaxRank?.toString() ?? '')
 
   return (
-    <div style={{ borderBottom: '1px solid #2d2d4e' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' }}>
-        <div style={{ cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
-          <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>
-            {expanded ? '▾' : '▸'} {col.collectionName}
+    <div style={{ borderBottom: '1px solid var(--border-soft)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 0' }}>
+        <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => setExpanded(!expanded)}>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: 'var(--dim)', fontSize: 12 }}>{expanded ? '▾' : '▸'}</span>
+            {col.collectionName}
           </p>
-          <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{col.collectionAddress}</p>
-          {(col.offerPriceEth || col.offerExpiryMin) && (
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#7c3aed' }}>
-              {col.offerPriceEth ? `Prix: ${col.offerPriceEth} ETH` : 'Prix: global'}
-              {' · '}
-              {col.offerExpiryMin ? `Durée: ${col.offerExpiryMin}min` : 'Durée: global'}
-            </p>
-          )}
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--dim)', fontFamily: 'monospace' }}>
+            {col.collectionAddress}
+          </p>
+          <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--accent-light)' }}>
+            {`Offre: -${col.offerBelowFloorPct}% · SL: -${col.stopLossPct}% · Max: ${col.offerMaxActive}`}
+            {col.snipeEnabled && (
+              <span style={{ color: 'var(--blue)', marginLeft: 6 }}>
+                {`· Snipe${col.snipeFloorPct != null ? ` ≤floor${col.snipeFloorPct >= 0 ? '+' : ''}${col.snipeFloorPct}%` : ''}${col.snipeMaxRank != null ? ` rank≤${col.snipeMaxRank}` : ''}`}
+              </span>
+            )}
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ ...styles.smallBtn, background: col.enabled ? '#22c55e' : '#4b5563' }} onClick={onToggle}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <button className="btn-sm"
+            style={{ background: col.enabled ? 'var(--green)' : 'var(--dim)', color: '#fff' }}
+            onClick={onToggle}>
             {col.enabled ? 'Active' : 'Inactive'}
           </button>
-          <button style={{ ...styles.smallBtn, background: '#ef4444' }} onClick={onDelete}>Supprimer</button>
+          <button className="btn-sm" style={{ background: '#ef4444', color: '#fff' }} onClick={onDelete}>
+            Supprimer
+          </button>
         </div>
       </div>
 
       {expanded && (
-        <div style={{ padding: '12px 0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
-            Config spécifique (vide = utilise la config globale)
-          </p>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
-                Prix offre (ETH)
+        <div className="fade-in" style={{ padding: '12px 0 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Offres */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <FormField label="Sous le floor (%)">
+              <input className="input" type="number" step="0.1" required
+                value={belowPct} onChange={e => setBelowPct(e.target.value)} />
+            </FormField>
+            <FormField label="Stop-loss (%)">
+              <input className="input" type="number" step="0.1" required
+                value={slPct} onChange={e => setSlPct(e.target.value)} />
+            </FormField>
+            <FormField label="Max offres actives">
+              <input className="input" type="number" step="1" min="1" required
+                value={maxActive} onChange={e => setMaxActive(e.target.value)} />
+            </FormField>
+          </div>
+
+          {/* Snipe */}
+          <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--accent-light)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Snipe
+            </p>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--muted)', fontSize: 13, cursor: 'pointer', paddingBottom: 10 }}>
+                <input type="checkbox" checked={snipeEnabled} onChange={e => setSnipeEnabled(e.target.checked)} />
+                Snipe activé
               </label>
-              <input style={styles.input} type="number" step="0.001" placeholder="Global"
-                value={price} onChange={e => setPrice(e.target.value)} />
+              <FormField label="% au-dessus floor (0 = floor, 5 = +5%)">
+                <input className="input" type="number" step="1" placeholder="ex: 0 ou 5"
+                  value={snipeFloorPct} onChange={e => setSnipeFloorPct(e.target.value)} />
+              </FormField>
+              <FormField label="Rank max (inclus) ex: 500">
+                <input className="input" type="number" step="1" min="1" placeholder="ex: 500"
+                  value={snipeMaxRank} onChange={e => setSnipeMaxRank(e.target.value)} />
+              </FormField>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ color: '#94a3b8', fontSize: 12, display: 'block', marginBottom: 4 }}>
-                Durée (minutes)
-              </label>
-              <input style={styles.input} type="number" step="1" placeholder="Global"
-                value={expiry} onChange={e => setExpiry(e.target.value)} />
-            </div>
-            <button style={styles.smallBtn} onClick={() => {
+          </div>
+
+          <button className="btn" style={{ background: 'var(--accent)', color: '#fff', alignSelf: 'flex-start' }}
+            onClick={() => {
               onSave({
-                offerPriceEth: price ? parseFloat(price) : null,
-                offerExpiryMin: expiry ? parseInt(expiry) : null
+                offerBelowFloorPct: parseFloat(belowPct),
+                stopLossPct: parseFloat(slPct),
+                offerMaxActive: parseInt(maxActive),
+                snipeEnabled,
+                snipeFloorPct: snipeFloorPct !== '' ? parseFloat(snipeFloorPct) : null,
+                snipeMaxRank: snipeMaxRank ? parseInt(snipeMaxRank) : null,
               })
               setExpanded(false)
             }}>
-              Sauver
-            </button>
-            <button style={{ ...styles.smallBtn, background: '#4b5563' }} onClick={() => {
-              onSave({ offerPriceEth: null, offerExpiryMin: null })
-              setPrice('')
-              setExpiry('')
-              setExpanded(false)
-            }}>
-              Reset
-            </button>
-          </div>
+            Sauvegarder
+          </button>
         </div>
       )}
     </div>
   )
 }
 
-function Field({ label, value, onChange, type = 'text', step }: {
-  label: string
-  value: string | number | null | undefined
-  onChange: (v: string) => void
-  type?: string
-  step?: string
-}) {
-  const safeValue = value === null || value === undefined || (typeof value === 'number' && isNaN(value)) ? '' : value
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label style={{ color: '#94a3b8', fontSize: 13 }}>{label}</label>
-      <input style={styles.input} type={type} step={step} value={safeValue}
-        onChange={e => onChange(e.target.value)} />
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={styles.section}>
-      <h2 style={styles.sectionTitle}>{title}</h2>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 130 }}>
+      <label style={{ color: 'var(--muted)', fontSize: 12 }}>{label}</label>
       {children}
     </div>
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  loading: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#94a3b8' },
-  page: { minHeight: '100vh' },
-  nav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', borderBottom: '1px solid #1e1e3a', background: '#12121f' },
-  logo: { fontSize: 20, fontWeight: 700, color: '#7c3aed', textDecoration: 'none' },
-  navLinks: { display: 'flex', gap: 24 },
-  navLink: { color: '#94a3b8', textDecoration: 'none', fontSize: 14 },
-  main: { maxWidth: 700, margin: '0 auto', padding: '32px 16px', display: 'flex', flexDirection: 'column', gap: 24 },
-  section: { background: '#1a1a2e', borderRadius: 10, padding: 24, border: '1px solid #2d2d4e' },
-  sectionTitle: { fontSize: 16, fontWeight: 600, margin: '0 0 20px', color: '#c4b5fd' },
-  row: { display: 'flex', alignItems: 'center', gap: 12 },
-  collectionRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #2d2d4e' },
-  configForm: { display: 'flex', flexDirection: 'column', gap: 16 },
-  configRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  label: { color: '#94a3b8', fontSize: 13 },
-  input: { padding: '10px 14px', borderRadius: 8, border: '1px solid #2d2d4e', background: '#0f0f13', color: '#e2e8f0', fontSize: 14, width: '100%', boxSizing: 'border-box' },
-  btn: { padding: '10px 20px', borderRadius: 8, background: '#7c3aed', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
-  smallBtn: { padding: '6px 12px', borderRadius: 6, color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
-  muted: { color: '#94a3b8', fontSize: 14, margin: '12px 0 0' },
-  msg: { color: '#22c55e', fontSize: 14, margin: 0 }
+function ConfigField({ label, value, onChange, type = 'text', step }: {
+  label: string; value: string | number | null | undefined
+  onChange: (v: string) => void; type?: string; step?: string
+}) {
+  const safe = value === null || value === undefined || (typeof value === 'number' && isNaN(value)) ? '' : value
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ color: 'var(--muted)', fontSize: 12 }}>{label}</label>
+      <input className="input" type={type} step={step} value={safe}
+        onChange={e => onChange(e.target.value)} />
+    </div>
+  )
+}
+
+const S: Record<string, React.CSSProperties> = {
+  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
 }
