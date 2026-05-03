@@ -39,14 +39,18 @@ router.get('/status', async (req, res) => {
 router.post('/start', async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { walletKeyEnc: true, offerBelowFloor: true }
+    select: { walletKeyEnc: true }
   })
 
   if (!user.walletKeyEnc) {
     return res.status(400).json({ error: 'Wallet non configuré' })
   }
-  if (!user.offerBelowFloor) {
-    return res.status(400).json({ error: '"Sous le floor" non configuré' })
+
+  const enabledCount = await prisma.userCollection.count({
+    where: { userId: req.user.id, enabled: true }
+  })
+  if (!enabledCount) {
+    return res.status(400).json({ error: 'Aucune collection activée — configurez au moins une collection' })
   }
 
   await prisma.user.update({

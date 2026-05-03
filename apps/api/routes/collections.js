@@ -15,14 +15,28 @@ router.get('/', async (req, res) => {
 })
 
 router.post('/', async (req, res) => {
-  const { collectionAddress, collectionName } = req.body
+  const { collectionAddress, collectionName, offerBelowFloorPct, stopLossPct, offerMaxActive,
+          snipeEnabled, snipeFloorPct, snipeMaxRank } = req.body
   if (!collectionAddress || !collectionName) {
     return res.status(400).json({ error: 'Adresse et nom requis' })
+  }
+  if (offerBelowFloorPct == null || stopLossPct == null) {
+    return res.status(400).json({ error: 'Sous le floor (%) et stop-loss requis' })
   }
 
   try {
     const collection = await prisma.userCollection.create({
-      data: { userId: req.user.id, collectionAddress, collectionName }
+      data: {
+        userId: req.user.id,
+        collectionAddress,
+        collectionName,
+        offerBelowFloorPct: parseFloat(offerBelowFloorPct),
+        stopLossPct: parseFloat(stopLossPct),
+        offerMaxActive: offerMaxActive != null ? parseInt(offerMaxActive) : 5,
+        snipeEnabled: snipeEnabled === true || snipeEnabled === 'true',
+        snipeFloorPct: snipeFloorPct != null && snipeFloorPct !== '' ? parseFloat(snipeFloorPct) : null,
+        snipeMaxRank: snipeMaxRank != null && snipeMaxRank !== '' ? parseInt(snipeMaxRank) : null
+      }
     })
     res.status(201).json(collection)
   } catch (err) {
@@ -32,11 +46,16 @@ router.post('/', async (req, res) => {
 })
 
 router.patch('/:id', async (req, res) => {
-  const { enabled, offerPriceEth, offerExpiryMin } = req.body
+  const { enabled, offerBelowFloorPct, stopLossPct, offerMaxActive,
+          snipeEnabled, snipeFloorPct, snipeMaxRank } = req.body
   const data = {}
   if (enabled !== undefined) data.enabled = enabled
-  if (offerPriceEth !== undefined) data.offerPriceEth = offerPriceEth === '' ? null : parseFloat(offerPriceEth)
-  if (offerExpiryMin !== undefined) data.offerExpiryMin = offerExpiryMin === '' ? null : parseInt(offerExpiryMin)
+  if (offerBelowFloorPct !== undefined) data.offerBelowFloorPct = parseFloat(offerBelowFloorPct)
+  if (stopLossPct !== undefined) data.stopLossPct = parseFloat(stopLossPct)
+  if (offerMaxActive !== undefined) data.offerMaxActive = parseInt(offerMaxActive)
+  if (snipeEnabled !== undefined) data.snipeEnabled = snipeEnabled === true || snipeEnabled === 'true'
+  if (snipeFloorPct !== undefined) data.snipeFloorPct = snipeFloorPct === '' || snipeFloorPct === null ? null : parseFloat(snipeFloorPct)
+  if (snipeMaxRank !== undefined) data.snipeMaxRank = snipeMaxRank === '' || snipeMaxRank === null ? null : parseInt(snipeMaxRank)
 
   try {
     const collection = await prisma.userCollection.updateMany({
